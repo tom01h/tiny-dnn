@@ -14,6 +14,13 @@
 #include "tiny_dnn/activations/activation_layer.h"
 #include "tiny_dnn/layers/layer.h"
 
+#include <chrono>    // for high_resolution_clock, NOLINT
+std::chrono::high_resolution_clock::time_point ast;
+std::chrono::high_resolution_clock::duration aft, abt;
+
+int af=0;
+int ab=0;
+
 namespace tiny_dnn {
 
 class relu_layer : public activation_layer {
@@ -23,19 +30,29 @@ class relu_layer : public activation_layer {
   std::string layer_type() const override { return "relu-activation"; }
 
   void forward_activation(const vec_t &x, vec_t &y) override {
+    ast = std::chrono::high_resolution_clock::now();
     for (size_t j = 0; j < x.size(); j++) {
       y[j] = std::max(float_t(0), x[j]);
     }
+    aft += std::chrono::high_resolution_clock::now() - ast;
+    if(++af==40000) std::cout << "activ forward "
+                              << std::chrono::duration_cast<std::chrono::milliseconds>(aft).count() << "ms elapsed"
+                              << std::endl;
   }
 
   void backward_activation(const vec_t &x,
                            const vec_t &y,
                            vec_t &dx,
                            const vec_t &dy) override {
+    ast = std::chrono::high_resolution_clock::now();
     for (size_t j = 0; j < x.size(); j++) {
       // dx = dy * (gradient of relu)
       dx[j] = dy[j] * (y[j] > float_t(0) ? float_t(1) : float_t(0));
     }
+    abt += std::chrono::high_resolution_clock::now() - ast;
+    if(++ab==40000) std::cout << "activ back "
+                              << std::chrono::duration_cast<std::chrono::milliseconds>(abt).count() << "ms elapsed"
+                              << std::endl;
   }
 
   std::pair<float_t, float_t> scale() const override {

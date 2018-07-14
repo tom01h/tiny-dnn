@@ -38,14 +38,14 @@
 /**
  * define to use exceptions
  */
-#define CNN_USE_EXCEPTIONS
+// #define CNN_USE_EXCEPTIONS
 
 /**
  * comment out if you want tiny-dnn to be quiet
  */
 #define CNN_USE_STDOUT
 
-// #define CNN_SINGLE_THREAD
+#define CNN_SINGLE_THREAD
 
 /**
  * disable serialization/deserialization function

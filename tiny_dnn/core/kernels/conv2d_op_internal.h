@@ -7,6 +7,13 @@
 */
 #pragma once
 
+#include <chrono>    // for high_resolution_clock, NOLINT
+std::chrono::high_resolution_clock::time_point cst;
+std::chrono::high_resolution_clock::duration cft, cbt;
+
+int cf=0;
+int cb=0;
+
 namespace tiny_dnn {
 namespace kernels {
 
@@ -16,6 +23,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
                                tensor_t &out_data,
                                const core::conv_params &params,
                                const bool parallelize) {
+  cst = std::chrono::high_resolution_clock::now();
   for_(parallelize, 0u, in_data.size(),
        [&](const blocked_range &r) {
          size_t out_area    = params.out.area();
@@ -69,6 +77,12 @@ inline void conv2d_op_internal(const tensor_t &in_data,
          }
        },
        0u);
+  cft += std::chrono::high_resolution_clock::now() - cst;
+  if(in_data.size()>1){
+    if(++cf==3750) std::cout << "cov forward "
+                             << std::chrono::duration_cast<std::chrono::milliseconds>(cft).count() << "ms elapsed"
+                             << std::endl;
+  }
 }
 
 /******************************************************************/
@@ -84,6 +98,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
                         const bool parallelize) {
   typedef typename vec_t::value_type float_t;
 
+  cst = std::chrono::high_resolution_clock::now();
   for_i(parallelize, prev_out.size(), [&](size_t sample) {
     // propagate delta to previous layer
     for (size_t inc = 0; inc < params.in.depth_; inc++) {
@@ -176,6 +191,10 @@ void conv2d_op_internal(const tensor_t &prev_out,
       }
     }
   });
+  cbt += std::chrono::high_resolution_clock::now() - cst;
+  if(++cb==3750) std::cout << "cov back "
+                           << std::chrono::duration_cast<std::chrono::milliseconds>(cbt).count() << "ms elapsed"
+                           << std::endl;
 }
 
 }  // namespace kernels

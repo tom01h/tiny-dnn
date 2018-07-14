@@ -11,55 +11,28 @@
 
 static void construct_net(tiny_dnn::network<tiny_dnn::sequential> &nn,
                           tiny_dnn::core::backend_t backend_type) {
-// connection table [Y.Lecun, 1998 Table.1]
-#define O true
-#define X false
-  // clang-format off
-static const bool tbl[] = {
-    O, X, X, X, O, O, O, X, X, O, O, O, O, X, O, O,
-    O, O, X, X, X, O, O, O, X, X, O, O, O, O, X, O,
-    O, O, O, X, X, X, O, O, O, X, X, O, X, O, O, O,
-    X, O, O, O, X, X, O, O, O, O, X, X, O, X, O, O,
-    X, X, O, O, O, X, X, O, O, O, O, X, O, O, X, O,
-    X, X, X, O, O, O, X, X, O, O, O, O, X, O, O, O
-};
-// clang-format on
-#undef O
-#undef X
 
-  // construct nets
-  //
-  // C : convolution
-  // S : sub-sampling
-  // F : fully connected
-  // clang-format off
-  using fc = tiny_dnn::layers::fc;
-  using conv = tiny_dnn::layers::conv;
-  using ave_pool = tiny_dnn::layers::ave_pool;
-  using tanh = tiny_dnn::activation::tanh;
+  //using fc       = tiny_dnn::fully_connected_layer;
+  using conv     = tiny_dnn::convolutional_layer;
+  using max_pool = tiny_dnn::max_pooling_layer;
+  using relu     = tiny_dnn::relu_layer;
+  using softmax  = tiny_dnn::softmax_layer;
+  //using avg_pool = tiny_dnn::average_pooling_layer;
 
   using tiny_dnn::core::connection_table;
   using padding = tiny_dnn::padding;
 
-  nn << conv(32, 32, 5, 1, 6,   // C1, 1@32x32-in, 6@28x28-out
-             padding::valid, true, 1, 1, backend_type)
-     << tanh()
-     << ave_pool(28, 28, 6, 2)   // S2, 6@28x28-in, 6@14x14-out
-     << tanh()
-     << conv(14, 14, 5, 6, 16,   // C3, 6@14x14-in, 16@10x10-out
-             connection_table(tbl, 6, 16),
-             padding::valid, true, 1, 1, backend_type)
-     << tanh()
-     << ave_pool(10, 10, 16, 2)  // S4, 16@10x10-in, 16@5x5-out
-     << tanh()
-     << conv(5, 5, 5, 16, 120,   // C5, 16@5x5-in, 120@1x1-out
-             padding::valid, true, 1, 1, backend_type)
-     << tanh()
-     << fc(120, 10, true, backend_type)  // F6, 120-in, 10-out
-     << tanh();
+  nn << conv(28, 28, 5, 1, 6, padding::valid, true, 1, 1, backend_type)
+     << max_pool(24, 24, 6, 2)
+     << relu()
+     << conv(12, 12, 5, 6, 16, padding::valid, true, 1, 1, backend_type)
+     << max_pool(8, 8, 16, 2)
+     << relu()
+     << conv(4, 4, 4, 16, 10, padding::valid, true, 1, 1, backend_type)
+     << softmax(10);
 }
 
-static void train_lenet(const std::string &data_dir_path,
+static void train_net(const std::string &data_dir_path,
                         double learning_rate,
                         const int n_train_epochs,
                         const int n_minibatch,
@@ -79,11 +52,14 @@ static void train_lenet(const std::string &data_dir_path,
   tiny_dnn::parse_mnist_labels(data_dir_path + "/train-labels.idx1-ubyte",
                                &train_labels);
   tiny_dnn::parse_mnist_images(data_dir_path + "/train-images.idx3-ubyte",
-                               &train_images, -1.0, 1.0, 2, 2);
+                               &train_images, -1.0, 1.0, 0, 0);
   tiny_dnn::parse_mnist_labels(data_dir_path + "/t10k-labels.idx1-ubyte",
                                &test_labels);
   tiny_dnn::parse_mnist_images(data_dir_path + "/t10k-images.idx3-ubyte",
-                               &test_images, -1.0, 1.0, 2, 2);
+                               &test_images, -1.0, 1.0, 0, 0);
+
+  train_labels.resize(20000);
+  train_images.resize(20000);
 
   std::cout << "start training" << std::endl;
 
@@ -100,8 +76,8 @@ static void train_lenet(const std::string &data_dir_path,
     std::cout << "Epoch " << epoch << "/" << n_train_epochs << " finished. "
               << t.elapsed() << "s elapsed." << std::endl;
     ++epoch;
-    tiny_dnn::result res = nn.test(test_images, test_labels);
-    std::cout << res.num_success << "/" << res.num_total << std::endl;
+    //tiny_dnn::result res = nn.test(test_images, test_labels);
+    //std::cout << res.num_success << "/" << res.num_total << std::endl;
 
     disp.restart(train_images.size());
     t.restart();
@@ -119,7 +95,7 @@ static void train_lenet(const std::string &data_dir_path,
   // test and show results
   nn.test(test_images, test_labels).print_detail(std::cout);
   // save network model & trained weights
-  nn.save("LeNet-model");
+  nn.save("Net-model");
 }
 
 static tiny_dnn::core::backend_t parse_backend_name(const std::string &name) {
@@ -137,14 +113,14 @@ static tiny_dnn::core::backend_t parse_backend_name(const std::string &name) {
 static void usage(const char *argv0) {
   std::cout << "Usage: " << argv0 << " --data_path path_to_dataset_folder"
             << " --learning_rate 1"
-            << " --epochs 30"
+            << " --epochs 1"
             << " --minibatch_size 16"
             << " --backend_type internal" << std::endl;
 }
 
 int main(int argc, char **argv) {
   double learning_rate                   = 1;
-  int epochs                             = 30;
+  int epochs                             = 1;
   std::string data_path                  = "";
   int minibatch_size                     = 16;
   tiny_dnn::core::backend_t backend_type = tiny_dnn::core::default_engine();
@@ -192,10 +168,10 @@ int main(int argc, char **argv) {
               << std::endl;
     return -1;
   }
-  if (minibatch_size <= 0 || minibatch_size > 60000) {
+  if (minibatch_size <= 0 || minibatch_size > 20000) {
     std::cerr
       << "Invalid minibatch size. The minibatch size must be greater than 0"
-         " and less than dataset size (60000)."
+         " and less than dataset size (20000)."
       << std::endl;
     return -1;
   }
@@ -207,7 +183,7 @@ int main(int argc, char **argv) {
             << "Backend type: " << backend_type << std::endl
             << std::endl;
   try {
-    train_lenet(data_path, learning_rate, epochs, minibatch_size, backend_type);
+    train_net(data_path, learning_rate, epochs, minibatch_size, backend_type);
   } catch (tiny_dnn::nn_error &err) {
     std::cerr << "Exception: " << err.what() << std::endl;
   }
