@@ -5,6 +5,43 @@
     Use of this source code is governed by a BSD-style license that can be found
     in the LICENSE file.
 */
+
+// verilator
+#include "unistd.h"
+#include "getopt.h"
+#include "Vtiny_dnn_top.h"
+#include "verilated.h"
+#include "verilated_vcd_c.h"
+
+#define VCD_PATH_LENGTH 256
+
+vluint64_t main_time = 0;
+vluint64_t vcdstart = 0;
+vluint64_t vcdend = 1000;
+
+VerilatedVcdC* tfp;
+Vtiny_dnn_top* verilator_top;
+
+void eval()
+{
+  verilator_top->clk = 0;
+  verilator_top->eval();
+  if((main_time>=vcdstart)&((main_time<vcdend)|(vcdend==0)))
+    tfp->dump(main_time);
+
+  main_time += 5;
+
+  verilator_top->clk = 1;
+  verilator_top->eval();
+  if((main_time>=vcdstart)&((main_time<vcdend)|(vcdend==0)))
+    tfp->dump(main_time);
+
+  main_time += 5;
+
+  return;
+}
+// verilator
+
 #include <iostream>
 
 #include "tiny_dnn/tiny_dnn.h"
@@ -60,6 +97,8 @@ static void train_net(const std::string &data_dir_path,
 
   train_labels.resize(20000);
   train_images.resize(20000);
+  //train_labels.resize(32);
+  //train_images.resize(32);
 
   std::cout << "start training" << std::endl;
 
@@ -151,6 +190,19 @@ int main(int argc, char **argv) {
       return -1;
     }
   }
+
+// verilator
+  char vcdfile[VCD_PATH_LENGTH];
+  strncpy(vcdfile,"tmp.vcd",VCD_PATH_LENGTH);
+  Verilated::commandArgs(argc, argv);
+  Verilated::traceEverOn(true);
+  tfp = new VerilatedVcdC;
+  verilator_top = new Vtiny_dnn_top;
+  verilator_top->trace(tfp, 99); // requires explicit max levels param
+  tfp->open(vcdfile);
+  main_time = 0;
+// verilator
+
   if (data_path == "") {
     std::cerr << "Data path not specified." << std::endl;
     usage(argv[0]);
@@ -187,5 +239,7 @@ int main(int argc, char **argv) {
   } catch (tiny_dnn::nn_error &err) {
     std::cerr << "Exception: " << err.what() << std::endl;
   }
+  delete verilator_top;
+  tfp->close();
   return 0;
 }

@@ -5,6 +5,10 @@
     Use of this source code is governed by a BSD-style license that can be found
     in the LICENSE file.
 */
+#include "Vtiny_dnn_top.h"
+extern Vtiny_dnn_top* verilator_top;
+extern void eval();
+
 #pragma once
 
 #include <chrono>    // for high_resolution_clock, NOLINT
@@ -58,7 +62,10 @@ inline void conv2d_op_internal(const tensor_t &in_data,
                    // should be optimized for small kernel(3x3,5x5)
                    for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
                      for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
-                       sum += pw_element[wx] * pin_element[wx];
+                       verilator_top->a = (double)pw_element[wx];
+                       verilator_top->b = (double)pin_element[wx];
+                       eval();
+                       sum += (float)verilator_top->x;
                      }
                      pw_element += kw;
                      pin_element += iw;
