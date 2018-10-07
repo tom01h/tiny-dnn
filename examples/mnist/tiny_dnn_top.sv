@@ -5,7 +5,6 @@ module tiny_dnn_top
    input wire        init,
    input wire        exec,
    input wire [12:0] a,
-   input real        w,
    input real        d,
    output real       x
    );
@@ -29,7 +28,6 @@ module tiny_dnn_top
                 .init(init),
                 .exec(exec),
                 .a(a[8:0]),
-                .w(w),
                 .d(d),
                 .sum(sum[i])
                 );
@@ -45,7 +43,6 @@ module tiny_dnn_core
    input wire       init,
    input wire       exec,
    input wire [8:0] a,
-   input real       w,
    input real       d,
    output real      sum
    );
@@ -56,7 +53,7 @@ module tiny_dnn_core
 
    always_ff @(posedge clk)begin
       if(write)begin
-         W[a] <= w;
+         W[a] <= d;
       end
       if(init)begin
          sum <= 0;

@@ -44,13 +44,14 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
   verilator_top->write = 1;
   verilator_top->init = 0;
+  verilator_top->exec = 0;
 
   for (size_t o = 0; o < od; o++) {
     for (size_t inc = 0; inc < id; inc++) {
       for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
         for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
           verilator_top->a = wx + wy*kw + inc*kw*kh + o*filter_size;
-          verilator_top->w = (double)W[wx + wy*kw + (inc+id*o)*kw*kh];
+          verilator_top->d = (double)W[wx + wy*kw + (inc+id*o)*kw*kh];
           eval();
         }
       }
