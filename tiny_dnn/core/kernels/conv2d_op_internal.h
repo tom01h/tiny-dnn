@@ -92,6 +92,8 @@ inline void conv2d_op_internal(const tensor_t &in_data,
             }
           }
 
+          eval();
+
           for (size_t o = 0; o < od; o++) {
             verilator_top->a = o;
             eval();

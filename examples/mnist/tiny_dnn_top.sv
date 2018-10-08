@@ -43,76 +43,105 @@ endmodule
 
 module tiny_dnn_core
   (
-   input wire        clk,
-   input wire        write,
-   input wire        init,
-   input wire        exec,
-   input wire [8:0]  a,
-   input wire [15:0] d, // bFloat16
-   output reg [31:0] sum // Signle
+   input wire         clk,
+   input wire         write,
+   input wire         init,
+   input wire         exec,
+   input wire [8:0]   a,
+   input wire [15:0]  d, // bfloat16
+   output wire [31:0] sum // float32
    );
 
    parameter f_size = 512;
 
    reg [15:0]         W [0:f_size-1];
-   wire [31:0]        sumo;
+
+   reg [15:0]         Wl;
+   reg [15:0]         dl;
+   reg                en;
 
    always_ff @(posedge clk)begin
-      if(write)begin
-         W[a] <= d;
-      end
-      if(init)begin
-         sum <= 0;
-      end
+      en <= exec;
       if(exec)begin
-         sum <= sumo;
+         dl <= d;
       end
    end
 
+   always_ff @(posedge clk)
+     if(exec)
+       Wl <= W[a];
+
+   always_ff @(posedge clk)
+     if(write)
+       W[a] <= d;
+
    fma fma
      (
-      .sum(sum[31:0]),
-      .w(W[a][15:0]),
-      .d(d[15:0]),
-      .out(sumo[31:0])
+      .clk(clk),
+      .init(init),
+      .exec(en),
+      .w(Wl[15:0]),
+      .d(dl[15:0]),
+      .sum(sum[31:0])
    );
 
 endmodule
 
 module fma
   (
-   input wire [31:0] sum,
+   input wire        clk,
+   input wire        init,
+   input wire        exec,
    input wire [15:0] w,
    input wire [15:0] d,
-   output reg [31:0] out
+   output reg [31:0] sum
    );
 
-   integer           frac;
-   integer           expo;
-   integer           expd;
-   integer           add;
+   reg signed [16:0] frac;
+   reg signed [9:0]  expm;
+   reg signed [9:0]  expd;
+
+   reg               signo;
+   reg signed [9:0]  expo;
+   reg signed [31:0] addo;
 
    always_comb begin
       frac = {9'h1,w[6:0]}  * {9'h1,d[6:0]};
-      expo = {1'b0,w[14:7]} + {1'b0,d[14:7]} -127;
-      expd = {1'b0,sum[30:23]} - expo;
+      expm = $signed({1'b0,w[14:7]} + {1'b0,d[14:7]}) -127;
+      expd = $signed({1'b0,sum[30:23]}) - expm;
    end
 
-   always_comb begin
-      if(sum[31]^w[15]^d[15])begin
-         if(sum[30:23]==8'h0)
-           add = -frac;
-         else if(expd>=0)
-           add = ({1'h1,sum[22:9]}<<expd   ) - frac;
-         else
-           add = ({1'h1,sum[22:9]}>>(-expd)) - frac;
-      end else begin
-         if(sum[30:23]==8'h0)
-           add = frac;
-         else if(expd>=0)
-           add = ({1'h1,sum[22:9]}<<expd   ) + frac;
-         else
-           add = ({1'h1,sum[22:9]}>>(-expd)) + frac;
+   always_ff @(posedge clk)begin
+      if(init)begin
+         addo <= 0;
+         expo <= 0;
+         signo <= 0;
+      end else if(exec)begin
+         signo <= sum[31];
+         if(expm<=0)begin             // mul = 0
+            expo <= sum[30:23];
+            addo <= {1'h1,sum[22:9]};
+         end else if(expd>16)begin    // mul << sum
+            expo <= sum[30:23];
+            addo <= {1'h1,sum[22:9]};
+         end else begin
+            expo <= expm;
+            if(sum[31]^w[15]^d[15])begin
+               if(sum[30:23]==8'h0)
+                 addo <= -frac;
+               else if(expd>=0)
+                 addo <= ({1'h1,sum[22:9]}<<expd   ) - frac;
+               else
+                 addo <= ({1'h1,sum[22:9]}>>(-expd)) - frac;
+            end else begin
+               if(sum[30:23]==8'h0)
+                 addo <= frac;
+               else if(expd>=0)
+                 addo <= ({1'h1,sum[22:9]}<<expd   ) + frac;
+               else
+                 addo <= ({1'h1,sum[22:9]}>>(-expd)) + frac;
+            end
+         end
       end
    end
 
@@ -121,12 +150,12 @@ module fma
    wire        sign;
 
    always_comb begin
-      if(add<0)begin
-         nrm5[31:0]=-add;
-         sign=~sum[31];
+      if(addo<0)begin
+         nrm5[31:0]=-addo;
+         sign=~signo;
       end else begin
-         nrm5[31:0]=add;
-         sign=sum[31];
+         nrm5[31:0]=addo;
+         sign=signo;
       end
 
       if(nrm5[31:16]!=0)begin
@@ -173,17 +202,13 @@ module fma
    end
 
    always_comb begin
-      if(expo<=0)begin             // mul = 0
-         out = sum;
-      end else if(expd>16)begin    // mul << sum
-         out = sum;
-      end else if(expn<=0)begin    // result = 0
-         out = 0;
+      if(expn<=0)begin
+         sum = 0;
       end else begin
-         out[31]    = sign;
-         out[30:23] = expn;
-         out[22:9]  = nrm0[30:17];
-         out[8:0]   = 0;
+         sum[31]    = sign;
+         sum[30:23] = expn;
+         sum[22:9]  = nrm0[30:17];
+         sum[8:0]   = 0;
       end
    end
 
