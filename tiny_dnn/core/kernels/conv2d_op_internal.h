@@ -18,6 +18,11 @@ std::chrono::high_resolution_clock::duration cft, cbt;
 int cf=0;
 int cb=0;
 
+union{
+  int i;
+  float f;
+} conv;
+
 namespace tiny_dnn {
 namespace kernels {
 
@@ -51,7 +56,8 @@ inline void conv2d_op_internal(const tensor_t &in_data,
       for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
         for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
           verilator_top->a = wx + wy*kw + inc*kw*kh + o*filter_size;
-          verilator_top->d = (double)W[wx + wy*kw + (inc+id*o)*kw*kh];
+          conv.f = W[wx + wy*kw + (inc+id*o)*kw*kh];
+          verilator_top->d = conv.i;
           eval();
         }
       }
@@ -71,12 +77,15 @@ inline void conv2d_op_internal(const tensor_t &in_data,
           verilator_top->init = 1;
           eval();
           verilator_top->init = 0;
+
           for (size_t inc = 0; inc < id; inc++) {
             for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
               for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
                 verilator_top->exec = 1;
                 verilator_top->a = wx + wy*kw + inc*kw*kh;
-                verilator_top->d = (double)in[wx + wy*iw + x*elem_stride + y*line_stride + inc*iw*ih];
+                conv.f = in[wx + wy*iw + x*elem_stride + y*line_stride + inc*iw*ih];
+                verilator_top->d = conv.i;
+
                 eval();
                 verilator_top->exec = 0;
               }
@@ -87,9 +96,11 @@ inline void conv2d_op_internal(const tensor_t &in_data,
             verilator_top->a = o;
             eval();
             if (params.has_bias) {
-              a[x + y*ow + o*ow*oh] = (float)verilator_top->x + bias[o];
+              conv.i = verilator_top->x;
+              a[x + y*ow + o*ow*oh] = conv.f + bias[o];
             }else{
-              a[x + y*ow + o*ow*oh] = (float)verilator_top->x;
+              conv.i = (float)verilator_top->x;
+              a[x + y*ow + o*ow*oh] = conv.f;
             }
           }
 

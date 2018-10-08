@@ -17,7 +17,7 @@
 
 vluint64_t main_time = 0;
 vluint64_t vcdstart = 0;
-vluint64_t vcdend = 1000;
+vluint64_t vcdend = 10000;
 
 VerilatedVcdC* tfp;
 Vtiny_dnn_top* verilator_top;
@@ -95,10 +95,12 @@ static void train_net(const std::string &data_dir_path,
   tiny_dnn::parse_mnist_images(data_dir_path + "/t10k-images.idx3-ubyte",
                                &test_images, -1.0, 1.0, 0, 0);
 
-  train_labels.resize(20000);
-  train_images.resize(20000);
-  //train_labels.resize(32);
-  //train_images.resize(32);
+  //train_labels.resize(20000);
+  //train_images.resize(20000);
+  train_labels.resize(3008);
+  train_images.resize(3008);
+  //test_labels.resize(1000);
+  //test_images.resize(1000);
 
   std::cout << "start training" << std::endl;
 
