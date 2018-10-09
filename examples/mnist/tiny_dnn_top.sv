@@ -100,6 +100,9 @@ module fma
    reg signed [16:0] frac;
    reg signed [9:0]  expm;
    reg signed [9:0]  expd;
+   reg signed [32:0] add0;
+   reg signed [48:0] alin;
+   reg               sftout;
 
    reg               signo;
    reg signed [9:0]  expo;
@@ -108,39 +111,33 @@ module fma
    always_comb begin
       frac = {9'h1,w[6:0]}  * {9'h1,d[6:0]};
       expm = $signed({1'b0,w[14:7]} + {1'b0,d[14:7]}) -127;
-      expd = $signed({1'b0,sum[30:23]}) - expm;
+      expd = expo - expm;
+
+      if(signo^w[15]^d[15])
+        add0 = -addo;
+      else
+        add0 = addo;
+
+      if(expd<0)
+        alin = add0>>>(-expd);
+      else if(expd<=16)
+        alin = add0<<expd;
+      else
+        alin = {49{1'bx}};
+
+      sftout = (expd>16) | (alin[48:30]!={19{1'b0}}) & (alin[48:30]!={19{1'b1}});
    end
 
    always_ff @(posedge clk)begin
       if(init)begin
-         addo <= 0;
-         expo <= 0;
          signo <= 0;
+         expo <= 0;
+         addo <= 0;
       end else if(exec)begin
-         signo <= sum[31];
-         if(expm<=0)begin             // mul = 0
-            expo <= sum[30:23];
-            addo <= {1'h1,sum[22:9]};
-         end else if(expd>16)begin    // mul << sum
-            expo <= sum[30:23];
-            addo <= {1'h1,sum[22:9]};
-         end else begin
+         if(~sftout)begin
+            signo <= w[15]^d[15];
             expo <= expm;
-            if(sum[31]^w[15]^d[15])begin
-               if(sum[30:23]==8'h0)
-                 addo <= -frac;
-               else if(expd>=0)
-                 addo <= ({1'h1,sum[22:9]}<<expd   ) - frac;
-               else
-                 addo <= ({1'h1,sum[22:9]}>>(-expd)) - frac;
-            end else begin
-               if(sum[30:23]==8'h0)
-                 addo <= frac;
-               else if(expd>=0)
-                 addo <= ({1'h1,sum[22:9]}<<expd   ) + frac;
-               else
-                 addo <= ({1'h1,sum[22:9]}>>(-expd)) + frac;
-            end
+            addo <= frac + alin;
          end
       end
    end
@@ -207,8 +204,7 @@ module fma
       end else begin
          sum[31]    = sign;
          sum[30:23] = expn;
-         sum[22:9]  = nrm0[30:17];
-         sum[8:0]   = 0;
+         sum[22:0]  = nrm0[30:8];
       end
    end
 
