@@ -11,148 +11,21 @@ module tiny_dnn_top
 
    parameter f_num  = 16;
 
-   wire [31:0]       sum [0:15];
-   wire [15:0]       bf_d;
-
-   always_ff @(posedge clk)begin
-      if(~write&~init&~exec)
-        x <= sum[a];
-   end
-
-   assign bf_d[15]   = d[31];
-   assign bf_d[14:7] = d[30:23];
-   assign bf_d[6:0]  = d[22:16];
-
-   generate
-      genvar i;
-      for (i = 0; i < f_num; i = i + 1) begin
-         tiny_dnn_core tiny_dnn_core
-               (
-                .clk(clk),
-                .write(write&(a[12:9] == i)),
-                .init(init),
-                .exec(exec),
-                .a(a[8:0]),
-                .d(bf_d),
-                .sum(sum[i])
-                );
-      end
-   endgenerate
-
-endmodule
-
-module tiny_dnn_core
-  (
-   input wire         clk,
-   input wire         write,
-   input wire         init,
-   input wire         exec,
-   input wire [8:0]   a,
-   input wire [15:0]  d, // bfloat16
-   output wire [31:0] sum // float32
-   );
-
-   parameter f_size = 512;
-
-   reg [15:0]         W [0:f_size-1];
-
-   reg [15:0]         Wl;
-   reg [15:0]         dl;
-   reg                en;
-
-   always_ff @(posedge clk)begin
-      en <= exec;
-      if(exec)begin
-         dl <= d;
-      end
-   end
-
-   always_ff @(posedge clk)
-     if(exec)
-       Wl <= W[a];
-
-   always_ff @(posedge clk)
-     if(write)
-       W[a] <= d;
-
-   fma fma
-     (
-      .clk(clk),
-      .init(init),
-      .exec(en),
-      .w(Wl[15:0]),
-      .d(dl[15:0]),
-      .sum(sum[31:0])
-   );
-
-endmodule
-
-module fma
-  (
-   input wire        clk,
-   input wire        init,
-   input wire        exec,
-   input wire [15:0] w,
-   input wire [15:0] d,
-   output reg [31:0] sum
-   );
-
-   reg signed [16:0] frac;
-   reg signed [9:0]  expm;
-   reg signed [9:0]  expd;
-   reg signed [32:0] add0;
-   reg signed [48:0] alin;
-   reg               sftout;
-
-   reg               signo;
-   reg signed [9:0]  expo;
-   reg signed [31:0] addo;
-
-   always_comb begin
-      frac = {9'h1,w[6:0]}  * {9'h1,d[6:0]};
-      expm = $signed({1'b0,w[14:7]} + {1'b0,d[14:7]}) -127;
-      expd = expo - expm;
-
-      if(signo^w[15]^d[15])
-        add0 = -addo;
-      else
-        add0 = addo;
-
-      if(expd<0)
-        alin = add0>>>(-expd);
-      else if(expd<=16)
-        alin = add0<<expd;
-      else
-        alin = {49{1'bx}};
-
-      sftout = (expd>16) | (alin[48:30]!={19{1'b0}}) & (alin[48:30]!={19{1'b1}});
-   end
-
-   always_ff @(posedge clk)begin
-      if(init)begin
-         signo <= 0;
-         expo <= 0;
-         addo <= 0;
-      end else if(exec)begin
-         if(~sftout)begin
-            signo <= w[15]^d[15];
-            expo <= expm;
-            addo <= frac + alin;
-         end
-      end
-   end
+   wire               signo [0:15];
+   wire signed [9:0]  expo [0:15];
+   wire signed [31:0] addo [0:15];
 
    wire [31:0] nrm5, nrm4, nrm3, nrm2, nrm1, nrm0;
    integer     exp4, exp3, exp2, exp1, exp0, expn;
    wire        sign;
 
    always_comb begin
-      if(addo<0)begin
-         nrm5[31:0]=-addo;
-         sign=~signo;
+      if(addo[a]<0)begin
+         nrm5[31:0]=-addo[a];
+         sign=~signo[a];
       end else begin
-         nrm5[31:0]=addo;
-         sign=signo;
+         nrm5[31:0]=addo[a];
+         sign=signo[a];
       end
 
       if(nrm5[31:16]!=0)begin
@@ -195,16 +68,146 @@ module fma
          exp0=-1;
       end
 
-      expn = expo+17+exp4+exp3+exp2+exp1+exp0;
+      expn = expo[a]+17+exp4+exp3+exp2+exp1+exp0;
    end
 
+   always_ff @(posedge clk)begin
+      if(~write&~init&~exec)
+        if(expn<=0)begin
+           x <= 0;
+        end else begin
+           x[31]    <= sign;
+           x[30:23] <= expn;
+           x[22:0]  <= nrm0[30:8];
+        end
+   end
+
+   wire [15:0]        bf_d;
+
+   assign bf_d[15]   = d[31];
+   assign bf_d[14:7] = d[30:23];
+   assign bf_d[6:0]  = d[22:16];
+
+   generate
+      genvar i;
+      for (i = 0; i < f_num; i = i + 1) begin
+         tiny_dnn_core tiny_dnn_core
+               (
+                .clk(clk),
+                .write(write&(a[12:9] == i)),
+                .init(init),
+                .exec(exec),
+                .a(a[8:0]),
+                .d(bf_d),
+                .signo(signo[i]),
+                .expo(expo[i]),
+                .addo(addo[i])
+                );
+      end
+   endgenerate
+
+endmodule
+
+module tiny_dnn_core
+  (
+   input wire                clk,
+   input wire                write,
+   input wire                init,
+   input wire                exec,
+   input wire [8:0]          a,
+   input wire [15:0]         d, // bfloat16
+   output wire               signo,
+   output wire signed [9:0]  expo,
+   output wire signed [31:0] addo
+   );
+
+   parameter f_size = 512;
+
+   reg [15:0]         W [0:f_size-1];
+
+   reg [15:0]         Wl;
+   reg [15:0]         dl;
+   reg                en;
+
+   always_ff @(posedge clk)begin
+      en <= exec;
+      if(exec)begin
+         dl <= d;
+      end
+   end
+
+   always_ff @(posedge clk)
+     if(exec)
+       Wl <= W[a];
+
+   always_ff @(posedge clk)
+     if(write)
+       W[a] <= d;
+
+   fma fma
+     (
+      .clk(clk),
+      .init(init),
+      .exec(en),
+      .w(Wl[15:0]),
+      .d(dl[15:0]),
+      .signo(signo),
+      .expo(expo[9:0]),
+      .addo(addo[31:0])
+   );
+
+endmodule
+
+module fma
+  (
+   input wire               clk,
+   input wire               init,
+   input wire               exec,
+   input wire [15:0]        w,
+   input wire [15:0]        d,
+   output reg               signo,
+   output reg signed [9:0]  expo,
+   output reg signed [31:0] addo
+   );
+
+   reg signed [16:0] frac;
+   reg signed [9:0]  expm;
+   reg signed [9:0]  expd;
+   reg signed [32:0] add0;
+   reg signed [48:0] alin;
+   reg               sftout;
+
    always_comb begin
-      if(expn<=0)begin
-         sum = 0;
-      end else begin
-         sum[31]    = sign;
-         sum[30:23] = expn;
-         sum[22:0]  = nrm0[30:8];
+      frac = {9'h1,w[6:0]}  * {9'h1,d[6:0]};
+      expm = $signed({1'b0,w[14:7]} + {1'b0,d[14:7]}) -127;
+      expd = expo - expm;
+
+      if(signo^w[15]^d[15])
+        add0 = -addo;
+      else
+        add0 = addo;
+
+      if(expd<0)
+        alin = add0>>>(-expd);
+      else if(expd<=16)
+        alin = add0<<expd;
+      else
+        alin = {49{1'bx}};
+
+      sftout = (expd>16) | (alin[48:30]!={19{1'b0}}) & (alin[48:30]!={19{1'b1}});
+   end
+
+   always_ff @(posedge clk)begin
+      if(init)begin
+         signo <= 0;
+         expo <= 0;
+         addo <= 0;
+      end else if(exec)begin
+         if(~sftout)begin
+            signo <= w[15]^d[15];
+            expo <= expm;
+            addo <= frac + alin;
+         end
       end
    end
 
