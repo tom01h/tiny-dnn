@@ -15,9 +15,9 @@ module tiny_dnn_top
    wire signed [9:0]  expo [0:15];
    wire signed [31:0] addo [0:15];
 
-   wire [31:0] nrm5, nrm4, nrm3, nrm2, nrm1, nrm0;
-   integer     exp4, exp3, exp2, exp1, exp0, expn;
-   wire        sign;
+   reg [31:0]         nrm5, nrm4, nrm3, nrm2, nrm1, nrm0;
+   reg signed [9:0]   expd, expn;
+   reg                sign;
 
    always_comb begin
       if(addo[a]<0)begin
@@ -28,47 +28,49 @@ module tiny_dnn_top
          sign=signo[a];
       end
 
+      expd[9:5] = 0;
+
       if(nrm5[31:16]!=0)begin
          nrm4=nrm5[31:0];
-         exp4=0;
+         expd[4]=0;
       end else begin
          nrm4={nrm5[15:0],16'h0000};
-         exp4=-16;
+         expd[4]=1;
       end
 
       if(nrm4[31:24]!=0)begin
          nrm3=nrm4[31:0];
-         exp3=0;
+         expd[3]=0;
       end else begin
          nrm3={nrm4[23:0],8'h00};
-         exp3=-8;
+         expd[3]=1;
       end
 
       if(nrm3[31:28]!=0)begin
          nrm2=nrm3[31:0];
-         exp2=0;
+         expd[2]=0;
       end else begin
          nrm2={nrm3[27:0],4'h0};
-         exp2=-4;
+         expd[2]=1;
       end
 
       if(nrm2[31:30]!=0)begin
          nrm1=nrm2[31:0];
-         exp1=0;
+         expd[1]=0;
       end else begin
          nrm1={nrm2[29:0],2'b00};
-         exp1=-2;
+         expd[1]=1;
       end
 
       if(nrm1[31])begin
          nrm0=nrm1[31:0];
-         exp0=0;
+         expd[0]=0;
       end else begin
          nrm0={nrm1[30:0],1'b0};
-         exp0=-1;
+         expd[0]=1;
       end
 
-      expn = expo[a]+17+exp4+exp3+exp2+exp1+exp0;
+      expn = expo[a]-expd+17-127;
    end
 
    always_ff @(posedge clk)begin
@@ -179,22 +181,20 @@ module fma
 
    always_comb begin
       frac = {9'h1,w[6:0]}  * {9'h1,d[6:0]};
-      expm = $signed({1'b0,w[14:7]} + {1'b0,d[14:7]}) -127;
-      expd = expo - expm;
+      expm = {1'b0,w[14:7]} + {1'b0,d[14:7]};
+      expd = expm - expo + 16;
 
       if(signo^w[15]^d[15])
         add0 = -addo;
       else
         add0 = addo;
 
-      if(expd<0)
-        alin = add0>>>(-expd);
-      else if(expd<=16)
-        alin = add0<<expd;
+      if(expd[9:6]!=0)
+        alin = 0;
       else
-        alin = {49{1'bx}};
+        alin = $signed({add0,16'h0})>>>expd[5:0];
 
-      sftout = (expd>16) | (alin[48:30]!={19{1'b0}}) & (alin[48:30]!={19{1'b1}});
+      sftout = (expd<0) | (alin[48:30]!={19{1'b0}}) & (alin[48:30]!={19{1'b1}});
    end
 
    always_ff @(posedge clk)begin
