@@ -48,6 +48,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   size_t filter_size = 512;
 
   verilator_top->write = 1;
+  verilator_top->read = 0;
   verilator_top->init = 0;
   verilator_top->exec = 0;
 
