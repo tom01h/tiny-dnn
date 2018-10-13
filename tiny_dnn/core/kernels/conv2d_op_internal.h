@@ -5,9 +5,14 @@
     Use of this source code is governed by a BSD-style license that can be found
     in the LICENSE file.
 */
-#include "Vtiny_dnn_top.h"
-extern Vtiny_dnn_top* verilator_top;
-extern void eval();
+
+extern int address;
+
+#define WEIGHT (address+0x00000000)
+#define EXEC   (address+0x00008000)
+#define INIT   (address+0x0000fffc)
+
+#define REG(reg_addr) *(volatile float*)(reg_addr)
 
 #pragma once
 
@@ -17,11 +22,6 @@ std::chrono::high_resolution_clock::duration cft, cbt;
 
 int cf=0;
 int cb=0;
-
-union{
-  int i;
-  float f;
-} conv;
 
 namespace tiny_dnn {
 namespace kernels {
@@ -47,25 +47,15 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   size_t line_stride = iw * params.h_stride;
   size_t filter_size = 512;
 
-  verilator_top->write = 1;
-  verilator_top->read = 0;
-  verilator_top->init = 0;
-  verilator_top->exec = 0;
-
   for (size_t o = 0; o < od; o++) {
     for (size_t inc = 0; inc < id; inc++) {
       for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
         for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
-          verilator_top->a = wx + wy*kw + inc*kw*kh + o*filter_size;
-          conv.f = W[wx + wy*kw + (inc+id*o)*kw*kh];
-          verilator_top->d = conv.i;
-          eval();
+          REG(WEIGHT+ (wx + wy*kw + inc*kw*kh + o*filter_size)*4) = W[wx + wy*kw + (inc+id*o)*kw*kh];
         }
       }
     }
   }
-
-  verilator_top->write = 0;
 
   //if (!params.tbl.is_connected(o, inc)) continue;
   if(in_data.size()>1){
@@ -74,36 +64,21 @@ inline void conv2d_op_internal(const tensor_t &in_data,
       vec_t &a        = out_data[sample];
       for (size_t y = 0; y < oh; y++) {
         for (size_t x = 0; x < ow; x++) {
-
-          verilator_top->init = 1;
-          eval();
-          verilator_top->init = 0;
-
+          REG(INIT) = 0;
           for (size_t inc = 0; inc < id; inc++) {
             for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
               for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
-                verilator_top->exec = 1;
-                verilator_top->a = wx + wy*kw + inc*kw*kh;
-                conv.f = in[wx + wy*iw + x*elem_stride + y*line_stride + inc*iw*ih];
-                verilator_top->d = conv.i;
-
-                eval();
-                verilator_top->exec = 0;
+                REG(EXEC + (wx + wy*kw + inc*kw*kh)*4) =
+                  in[wx + wy*iw + x*elem_stride + y*line_stride + inc*iw*ih];
               }
             }
           }
 
-          eval();
-
           for (size_t o = 0; o < od; o++) {
-            verilator_top->a = o;
-            eval();
             if (params.has_bias) {
-              conv.i = verilator_top->x;
-              a[x + y*ow + o*ow*oh] = conv.f + bias[o];
+              a[x + y*ow + o*ow*oh] = REG(EXEC + o*4) + bias[o];
             }else{
-              conv.i = (float)verilator_top->x;
-              a[x + y*ow + o*ow*oh] = conv.f;
+              a[x + y*ow + o*ow*oh] = REG(EXEC + o*4);
             }
           }
 
