@@ -122,9 +122,9 @@ module tiny_dnn_top
      (
       .clk(S_AXI_ACLK),
       .en(nrmen),
-      .signo(signo[a]),
-      .expo(expo[a]),
-      .addo(addo[a]),
+      .signo(signo[S_AXI_ARADDR[5:2]]),
+      .expo(expo[S_AXI_ARADDR[5:2]]),
+      .addo(addo[S_AXI_ARADDR[5:2]]),
       .nrm(nrm)
    );
 

@@ -57,6 +57,7 @@ Vivado で Zynq PS と ```CORA/tiny_dnn_top.v, tiny_dnn_core.sv``` をつない�
 その時 ```tiny_dnn_top``` は ```0x40000000``` から ```0x4000ffff``` にマップする。  
 Vivado でビットストリーム込みの hdf ファイルをエクスポート、```peta/project_1.sdk```にコピーして、
 ```
+$ source /opt/pkg/petalinux/settings.sh
 $ cd peta
 $ petalinux-create --type project --template zynq --name tiny-dnn
 $ cd tiny-dnn/

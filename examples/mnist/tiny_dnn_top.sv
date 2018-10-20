@@ -76,8 +76,9 @@ module normalize
    );
 
    reg [31:0]         nrm5, nrm4, nrm3, nrm2, nrm1, nrm0;
-   reg signed [9:0]   expd, expn;
-   reg                sign;
+   reg signed [9:0]   expn, expl;
+   reg [9:0]          expd;
+   reg                sign, signl;
 
    always_comb begin
       if(addo<0)begin
@@ -88,8 +89,6 @@ module normalize
          sign=signo;
       end
 
-      expd[9:5] = 0;
-
       if(nrm5[31:16]!=0)begin
          nrm4=nrm5[31:0];
          expd[4]=0;
@@ -99,13 +98,25 @@ module normalize
       end
 
       if(nrm4[31:24]!=0)begin
-         nrm3=nrm4[31:0];
          expd[3]=0;
       end else begin
-         nrm3={nrm4[23:0],8'h00};
          expd[3]=1;
       end
+   end
 
+   always_ff @(posedge clk)begin
+      if(en)begin
+         signl <= sign;
+         expl <= expo - {1'b0,expd[4:3],3'b000};
+         if(nrm4[31:24]!=0)begin
+            nrm3<=nrm4[31:0];
+         end else begin
+            nrm3<={nrm4[23:0],8'h00};
+         end
+      end
+   end
+
+   always_comb begin
       if(nrm3[31:28]!=0)begin
          nrm2=nrm3[31:0];
          expd[2]=0;
@@ -130,19 +141,17 @@ module normalize
          expd[0]=1;
       end
 
-      expn = expo-expd+17-127;
+      expn = expl-{1'b0,expd[2:0]}+17-127;
+
+      if(expn<=0)begin
+         nrm = 0;
+      end else begin
+         nrm[31]    = signl;
+         nrm[30:23] = expn;
+         nrm[22:0]  = nrm0[30:8];
+      end
    end
 
-   always_ff @(posedge clk)begin
-      if(en)
-        if(expn<=0)begin
-           nrm <= 0;
-        end else begin
-           nrm[31]    <= sign;
-           nrm[30:23] <= expn;
-           nrm[22:0]  <= nrm0[30:8];
-        end
-   end
 endmodule
 
 module tiny_dnn_core
