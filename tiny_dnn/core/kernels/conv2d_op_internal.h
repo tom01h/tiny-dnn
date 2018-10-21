@@ -42,58 +42,82 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   size_t line_stride = iw * params.h_stride;
   size_t filter_size = 512;
 
-  verilator_top->write = 1;
-  verilator_top->init = 0;
+  verilator_top->id = id-1;
+  verilator_top->is = iw*ih;
+  verilator_top->ih = ih-1;
+  verilator_top->iw = iw-1;
+  verilator_top->od = od-1;
+  verilator_top->os = ow*oh;
+  verilator_top->oh = oh-1;
+  verilator_top->ow = ow-1;
+  verilator_top->kh = kh-1;
+  verilator_top->kw = kw-1;
+
+  verilator_top->write = 0;
   verilator_top->exec = 0;
+  verilator_top->outr = 0;
+  verilator_top->s_init = 0;
+  verilator_top->init = 1;
+  eval();
+  verilator_top->init = 0;
+
+  verilator_top->write = 1;
 
   for (size_t o = 0; o < od; o++) {
     for (size_t inc = 0; inc < id; inc++) {
       for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
         for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
-          verilator_top->a = wx + wy*kw + inc*kw*kh + o*filter_size;
           verilator_top->d = (double)W[wx + wy*kw + (inc+id*o)*kw*kh];
           eval();
         }
       }
     }
+    if (params.has_bias) {
+      verilator_top->d = (double)bias[o];
+    }else{
+      verilator_top->d = (double)0;
+    }
+    eval();
+    verilator_top->s_init = 1;
+    eval();
+    verilator_top->s_init = 0;
   }
 
   verilator_top->write = 0;
 
-  //if (!params.tbl.is_connected(o, inc)) continue;
+  // NOT supported parametor
+  // params.tbl.is_connected
+  // params.w_stride
+  // params.h_stride
   if(in_data.size()>1){
     for (size_t sample = 0; sample < in_data.size(); sample++) {
       const vec_t &in = in_data[sample];
       vec_t &a        = out_data[sample];
-      for (size_t y = 0; y < oh; y++) {
-        for (size_t x = 0; x < ow; x++) {
+      verilator_top->s_init = 1;
+      eval();
+      verilator_top->s_init = 0;
+      for (size_t map = 0; map < oh*ow; map++) {
 
-          verilator_top->init = 1;
+        verilator_top->init = 1;
+        eval();
+        verilator_top->init = 0;
+        verilator_top->exec = 1;
+
+        for (size_t kernel = 0; kernel < id*kh*kw; kernel++) {
+          verilator_top->d = (double)in[verilator_top->ia];
           eval();
-          verilator_top->init = 0;
-          for (size_t inc = 0; inc < id; inc++) {
-            for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
-              for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
-                verilator_top->exec = 1;
-                verilator_top->a = wx + wy*kw + inc*kw*kh;
-                verilator_top->d = (double)in[wx + wy*iw + x*elem_stride + y*line_stride + inc*iw*ih];
-                eval();
-                verilator_top->exec = 0;
-              }
-            }
-          }
-
-          for (size_t o = 0; o < od; o++) {
-            verilator_top->a = o;
-            eval();
-            if (params.has_bias) {
-              a[x + y*ow + o*ow*oh] = (float)verilator_top->x + bias[o];
-            }else{
-              a[x + y*ow + o*ow*oh] = (float)verilator_top->x;
-            }
-          }
-
         }
+
+        verilator_top->exec = 0;
+        eval();
+
+        verilator_top->outr = 1;
+        for (size_t o = 0; o < od; o++) {
+          eval();
+          a[verilator_top->oa] = (float)verilator_top->x;
+        }
+        verilator_top->outr = 0;
+
       }
     }
   }else{
