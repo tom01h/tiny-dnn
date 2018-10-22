@@ -54,8 +54,6 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   verilator_top->kw = kw-1;
 
   verilator_top->write = 0;
-  verilator_top->exec = 0;
-  verilator_top->outr = 0;
   verilator_top->s_init = 0;
   verilator_top->init = 1;
   eval();
@@ -96,29 +94,17 @@ inline void conv2d_op_internal(const tensor_t &in_data,
       verilator_top->s_init = 1;
       eval();
       verilator_top->s_init = 0;
-      for (size_t map = 0; map < oh*ow; map++) {
 
-        verilator_top->init = 1;
-        eval();
-        verilator_top->init = 0;
-        verilator_top->exec = 1;
-
-        for (size_t kernel = 0; kernel < id*kh*kw; kernel++) {
+      while(!verilator_top->s_fin) {
+        if(verilator_top->exec)
           verilator_top->d = (double)in[verilator_top->ia];
-          eval();
-        }
-
-        verilator_top->exec = 0;
-        eval();
-
-        verilator_top->outr = 1;
-        for (size_t o = 0; o < od; o++) {
-          eval();
+        if(verilator_top->outr)
           a[verilator_top->oa] = (float)verilator_top->x;
-        }
-        verilator_top->outr = 0;
-
+        eval();
       }
+      if(verilator_top->outr)
+        a[verilator_top->oa] = (float)verilator_top->x;
+
     }
   }else{
     for (size_t sample = 0; sample < in_data.size(); sample++) {

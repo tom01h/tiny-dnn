@@ -1,15 +1,20 @@
 module tiny_dnn_top
   (
    input wire         clk,
+
    input wire         s_init,
+   output wire        s_fin,
+
+   output wire        exec,
+   output wire [12:0] ia,
+   input real         d,
+
+   output wire        outr,
+   output wire [12:0] oa,
+   output real        x,
+
    input wire         init,
    input wire         write,
-   input wire         exec,
-   input wire         outr,
-   output wire [12:0] ia,
-   output wire [12:0] oa,
-   input real         d,
-   output real        x,
 
    input wire [3:0]   id,
    input wire [9:0]   is,
@@ -30,6 +35,7 @@ module tiny_dnn_top
    wire [12:0]        wa;
    wire [12:0]        ia;
    wire [3:0]         ra;
+   wire               k_init;
    wire               k_fin;
 
    always_ff @(posedge clk)begin
@@ -40,6 +46,8 @@ module tiny_dnn_top
      (
       .clk(clk),
       .s_init(s_init),
+      .k_init(k_init),
+      .s_fin(s_fin),
       .init(init),
       .write(write),
       .exec(exec),
@@ -67,7 +75,7 @@ module tiny_dnn_top
          tiny_dnn_core tiny_dnn_core
                (
                 .clk(clk),
-                .init(init),
+                .init(k_init),
                 .write(write&(wa[12:9] == i)),
                 .exec(exec),
                 .bias(k_fin),
@@ -84,10 +92,12 @@ module address_gen
   (
    input wire        clk,
    input wire        s_init,
+   output reg        k_init,
+   output reg        s_fin,
    input wire        init,
    input wire        write,
-   input wire        exec,
-   input wire        outr,
+   output reg        exec,
+   output reg        outr,
    output reg [12:0] wa,
    output reg [12:0] ia,
    output reg [3:0]  ra,
@@ -117,10 +127,19 @@ module address_gen
 
    reg [12:0] iac;
 
+   reg [3:0] outc;
+   reg [9:0] outp;
+   reg       outrp;
+
    always_ff @(posedge clk)begin
       if(s_init)begin
          wa <= (wa+f_size)&~(f_size-1);
-      end else if(init)begin
+         //k_init <= 1'b1;
+         k_init <= ~write;
+         s_fin <= 1'b0;
+      end else if(k_init|init)begin
+         k_init <= 1'b0;
+         exec <= k_init;
          inc <= 0;
          wy <= 0;
          wx <= 0;
@@ -147,10 +166,17 @@ module address_gen
             wx <= 0;
             wy <= 0;
             inc <= 0;
+            exec <= 1'b0;
             k_fin <= exec;
          end
       end else begin
          k_fin <= 1'b0;
+         if(outrp&(outc==od))begin
+            if(outp+1==os)
+              s_fin <= 1'b1;
+            else
+              k_init <= 1'b1;
+         end
       end
    end
 
@@ -169,25 +195,30 @@ module address_gen
       end
    end
 
-   reg [9:0] outp;
-   reg       outrr;
-
    always_ff @(posedge clk)begin
-      outrr <= outr;
-      if(~outr)begin
+      outr <= outrp;
+      if(~outrp)begin
          ra <= 0;
       end else begin
          ra <= ra+1;
       end
-      if(~(outr&outrr))begin
+      if(~(outrp&outr))begin
          oa <= outp;
       end else begin
          oa <= oa+os;
       end
       if(s_init)begin
          outp <= 0;
-      end else if(~outr&outrr)begin
+      end else if(~outrp&outr)begin
          outp <= outp+1;
+      end
+      if(k_fin)begin
+         outc <= 0;
+         outrp <= 1'b1;
+      end else if(outc!=od)begin
+         outc <= outc+1;
+      end else begin
+         outrp <= 1'b0;
       end
    end
 
