@@ -2,24 +2,28 @@ module tiny_dnn_top
   (
    input wire         clk,
 
+   input wire         src_valid,
+   input real         src_data,
+   input wire         src_last,
+   output wire        src_ready,
+
+   output wire        dst_valid,
+   output real        dst_data,
+   output wire        dst_last,
+   input wire         dst_ready,
+
    input wire         s_init,
-   output wire        s_fin,
-
-   output wire        exec,
-   output wire [12:0] ia,
-   input real         d,
-
-   output wire        outr,
-   output wire [12:0] oa,
-   output real        x,
 
    input wire         init,
    input wire         write,
+   input real         d,
 
+   input wire [11:0]  ss,
    input wire [3:0]   id,
    input wire [9:0]   is,
    input wire [4:0]   ih,
    input wire [4:0]   iw,
+   input wire [11:0]  ds,
    input wire [3:0]   od,
    input wire [9:0]   os,
    input wire [4:0]   oh,
@@ -30,33 +34,93 @@ module tiny_dnn_top
 
    parameter f_num  = 16;
 
-   real               sum [0:15];
+   //  batch control <-> sample control
+   wire               s_init_; //TEMP//TEMP//
+   wire               s_fin;
 
-   wire [12:0]        wa;
-   wire [12:0]        ia;
-   wire [3:0]         ra;
+   // sample control -> core
    wire               k_init;
    wire               k_fin;
+   wire [12:0]        wa;
+   wire [3:0]         ra;
 
-   always_ff @(posedge clk)begin
-      x <= sum[ra];
+   // sample control -> core, src buffer
+   wire               exec;
+   wire [11:0]        ia;
+   // sample control -> core, dst buffer
+   wire               outr;
+   wire [11:0]        oa;
+
+   // batch control -> src buffer
+   wire               src_v;
+   wire [11:0]        src_a;
+   // batch control -> dst buffer
+   wire               dst_v;
+   wire [11:0]        dst_a;
+
+   // core <-> src,dst buffer
+   real               dd; //TEMP//TEMP//
+   real               sum [0:15];
+   real               x;
+   always_comb begin
+      x = sum[ra];
    end
 
-   address_gen address_gen
+
+   batch_ctrl batch_ctrl
      (
       .clk(clk),
-      .s_init(s_init),
-      .k_init(k_init),
+      .s_init(s_init_),
       .s_fin(s_fin),
+      .src_valid(src_valid),
+      .src_last(src_last),
+      .src_ready(src_ready),
+      .src_v(src_v),
+      .src_a(src_a[11:0]),
+      .dst_valid(dst_valid),
+      .dst_v(dst_v),
+      .dst_a(dst_a[11:0]),
+      .ss(ss[11:0]),
+      .ds(ds[11:0])
+      );
+
+   src_buf src_buf
+     (
+      .clk(clk),
+      .src_v(src_v),
+      .src_a(src_a[11:0]),
+      .src_d(src_data),
+      .exec(exec|k_init),
+      .ia(ia[11:0]),
+      .d(dd)
+      );
+
+   dst_buf dst_buf
+     (
+      .clk(clk),
+      .dst_v(dst_v),
+      .dst_a(dst_a[11:0]),
+      .dst_d(dst_data),
+      .outr(outr),
+      .oa(oa[11:0]),
+      .x(x)
+      );
+
+   sample_ctrl sample_ctrl
+     (
+      .clk(clk),
       .init(init),
       .write(write),
-      .exec(exec),
-      .outr(outr),
-      .wa(wa[12:0]),
-      .ia(ia[12:0]),
-      .ra(ra[3:0]),
-      .oa(oa[12:0]),
+      .s_init(s_init|s_init_),//TEMP//TEMP//
+      .s_fin(s_fin),
+      .k_init(k_init),
       .k_fin(k_fin),
+      .exec(exec),
+      .ia(ia[11:0]),
+      .outr(outr),
+      .oa(oa[11:0]),
+      .wa(wa[12:0]),
+      .ra(ra[3:0]),
       .id(id[3:0]),
       .is(is[9:0]),
       .ih(ih[4:0]),
@@ -81,6 +145,7 @@ module tiny_dnn_top
                 .bias(k_fin),
                 .a(wa[8:0]),
                 .d(d),
+                .dd(dd), //TEMP//TEMP//
                 .sum(sum[i])
                 );
       end
@@ -88,7 +153,96 @@ module tiny_dnn_top
 
 endmodule
 
-module address_gen
+module batch_ctrl
+  (
+   input wire        clk,
+   output wire       s_init,
+   input wire        s_fin,
+   input wire        src_valid,
+   input wire        src_last,
+   output wire       src_ready,
+   output wire       src_v,
+   output reg [11:0] src_a,
+   output reg        dst_valid,
+   output reg        dst_v,
+   output reg [11:0] dst_a,
+
+   input wire [11:0] ss,
+   input wire [11:0] ds
+   );
+   assign src_v = src_valid;
+   assign src_ready = 1'b1;
+ 
+   always_ff @(posedge clk)begin
+      if(~src_valid)begin//TEMP//TEMP//
+         src_a <= 0;
+      end else if(src_valid) begin
+         src_a <= src_a + 1;
+      end
+      s_init <= (src_a==ss);
+   end
+
+   always_ff @(posedge clk)begin
+      if(s_fin)begin
+         dst_valid <= 1'b1;
+         dst_v <= 1'b1;
+         dst_a <= 0;
+      end else if(dst_a!=ds)begin
+         dst_a <= dst_a + 1;
+      end else begin
+         dst_v <= 1'b0;
+      end
+      dst_valid <= dst_v;
+   end
+endmodule
+
+module src_buf
+  (
+   input wire        clk,
+   input wire        src_v,
+   input wire [11:0] src_a,
+   input real        src_d,
+   input wire        exec,
+   input wire [11:0] ia,
+   output real       d
+   );
+
+   real              buff [0:4095];
+
+   always_ff @(posedge clk)begin
+      if(src_v)begin
+         buff[src_a] <= src_d;
+      end
+      if(exec)begin
+         d <= buff[ia];
+      end
+   end
+endmodule
+
+module dst_buf
+  (
+   input wire        clk,
+   input wire        dst_v,
+   input wire [11:0] dst_a,
+   output real       dst_d,
+   input wire        outr,
+   input wire [11:0] oa,
+   input real        x
+   );
+
+   real              buff [0:4095];
+
+   always_ff @(posedge clk)begin
+      if(outr)begin
+         buff[oa] <= x;
+      end
+      if(dst_v)begin
+         dst_d <= buff[dst_a];
+      end
+   end
+endmodule
+
+module sample_ctrl
   (
    input wire        clk,
    input wire        s_init,
@@ -136,7 +290,6 @@ module address_gen
          wa <= (wa+f_size)&~(f_size-1);
          //k_init <= 1'b1;
          k_init <= ~write;
-         s_fin <= 1'b0;
       end else if(k_init|init)begin
          k_init <= 1'b0;
          exec <= k_init;
@@ -171,6 +324,7 @@ module address_gen
          end
       end else begin
          k_fin <= 1'b0;
+         s_fin <= 1'b0;
          if(outrp&(outc==od))begin
             if(outp+1==os)
               s_fin <= 1'b1;
@@ -197,7 +351,7 @@ module address_gen
 
    always_ff @(posedge clk)begin
       outr <= outrp;
-      if(~outrp)begin
+      if(~outr)begin
          ra <= 0;
       end else begin
          ra <= ra+1;
@@ -233,12 +387,15 @@ module tiny_dnn_core
    input wire       bias,
    input wire [8:0] a,
    input real       d,
+   input real       dd, //TEMP//TEMP//
    output real      sum
    );
 
    parameter f_size = 512;
 
    real          W [0:f_size-1];
+   real          w;
+   reg           exec1,bias1;
 
    always_ff @(posedge clk)begin
       if(write)begin
@@ -247,11 +404,16 @@ module tiny_dnn_core
       if(init)begin
          sum <= 0;
       end
-      if(exec)begin
-         sum <= sum + W[a] * d;
+      exec1 <= exec;
+      bias1 <= bias;
+      if(exec|bias)begin
+         w <= W[a];
       end
-      if(bias)begin
-         sum <= sum + W[a];
+      if(exec1)begin
+         sum <= sum + w * dd;
+      end
+      if(bias1)begin
+         sum <= sum + w;
       end
    end
 

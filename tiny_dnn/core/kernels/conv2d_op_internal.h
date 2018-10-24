@@ -42,10 +42,12 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   size_t line_stride = iw * params.h_stride;
   size_t filter_size = 512;
 
+  verilator_top->ss = iw*ih*id-1;
   verilator_top->id = id-1;
   verilator_top->is = iw*ih;
   verilator_top->ih = ih-1;
   verilator_top->iw = iw-1;
+  verilator_top->ds = ow*oh*od-1;
   verilator_top->od = od-1;
   verilator_top->os = ow*oh;
   verilator_top->oh = oh-1;
@@ -54,7 +56,6 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   verilator_top->kw = kw-1;
 
   verilator_top->write = 0;
-  verilator_top->s_init = 0;
   verilator_top->init = 1;
   eval();
   verilator_top->init = 0;
@@ -91,19 +92,27 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     for (size_t sample = 0; sample < in_data.size(); sample++) {
       const vec_t &in = in_data[sample];
       vec_t &a        = out_data[sample];
-      verilator_top->s_init = 1;
-      eval();
-      verilator_top->s_init = 0;
 
-      while(!verilator_top->s_fin) {
-        if(verilator_top->exec)
-          verilator_top->d = (double)in[verilator_top->ia];
-        if(verilator_top->outr)
-          a[verilator_top->oa] = (float)verilator_top->x;
+      //   input wire         src_valid,
+      //   input real         src_data,
+      //   input wire         src_last,
+      //   output wire        src_ready,
+
+      verilator_top->src_valid = 1;
+      for(size_t i=0;i<iw*ih*id;i++){
+        verilator_top->src_data = in[i];
         eval();
       }
-      if(verilator_top->outr)
-        a[verilator_top->oa] = (float)verilator_top->x;
+      verilator_top->src_valid = 0;
+
+      while(!verilator_top->dst_valid) {
+        eval();
+      }
+      
+      for(size_t i=0;verilator_top->dst_valid;i++){
+        a[i] = (float)verilator_top->dst_data;
+        eval();
+      }
 
     }
   }else{

@@ -17,7 +17,7 @@
 
 vluint64_t main_time = 0;
 vluint64_t vcdstart = 0;
-vluint64_t vcdend = 200000;
+vluint64_t vcdend = 300000;
 
 VerilatedVcdC* tfp;
 Vtiny_dnn_top* verilator_top;
