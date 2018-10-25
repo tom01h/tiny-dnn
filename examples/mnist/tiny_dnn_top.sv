@@ -1,41 +1,42 @@
 module tiny_dnn_top
   (
-   input wire         clk,
+   input wire        clk,
 
-   input wire         src_valid,
-   input real         src_data,
-   input wire         src_last,
-   output wire        src_ready,
+   input wire        run,
+   input wire        wwrite,
+   input wire        bwrite,
 
-   output wire        dst_valid,
-   output real        dst_data,
-   output wire        dst_last,
-   input wire         dst_ready,
+   input wire        src_valid,
+   input real        src_data,
+   input wire        src_last,
+   output wire       src_ready,
 
-   input wire         s_init,
+   output wire       dst_valid,
+   output real       dst_data,
+   output wire       dst_last,
+   input wire        dst_ready,
 
-   input wire         init,
-   input wire         write,
-   input real         d,
+   input wire        init,
 
-   input wire [11:0]  ss,
-   input wire [3:0]   id,
-   input wire [9:0]   is,
-   input wire [4:0]   ih,
-   input wire [4:0]   iw,
-   input wire [11:0]  ds,
-   input wire [3:0]   od,
-   input wire [9:0]   os,
-   input wire [4:0]   oh,
-   input wire [4:0]   ow,
-   input wire [2:0]   kh,
-   input wire [2:0]   kw
+   input wire [11:0] ss,
+   input wire [3:0]  id,
+   input wire [9:0]  is,
+   input wire [4:0]  ih,
+   input wire [4:0]  iw,
+   input wire [11:0] ds,
+   input wire [3:0]  od,
+   input wire [9:0]  os,
+   input wire [4:0]  oh,
+   input wire [4:0]  ow,
+   input wire [7:0]  fs,
+   input wire [2:0]  kh,
+   input wire [2:0]  kw
    );
 
    parameter f_num  = 16;
 
    //  batch control <-> sample control
-   wire               s_init_; //TEMP//TEMP//
+   wire               s_init;
    wire               s_fin;
 
    // sample control -> core
@@ -59,7 +60,7 @@ module tiny_dnn_top
    wire [11:0]        dst_a;
 
    // core <-> src,dst buffer
-   real               dd; //TEMP//TEMP//
+   real               d;
    real               sum [0:15];
    real               x;
    always_comb begin
@@ -70,7 +71,7 @@ module tiny_dnn_top
    batch_ctrl batch_ctrl
      (
       .clk(clk),
-      .s_init(s_init_),
+      .s_init(s_init),
       .s_fin(s_fin),
       .src_valid(src_valid),
       .src_last(src_last),
@@ -92,7 +93,7 @@ module tiny_dnn_top
       .src_d(src_data),
       .exec(exec|k_init),
       .ia(ia[11:0]),
-      .d(dd)
+      .d(d)
       );
 
    dst_buf dst_buf
@@ -110,8 +111,11 @@ module tiny_dnn_top
      (
       .clk(clk),
       .init(init),
+      .run(run),
+      .wwrite(wwrite),
+      .bwrite(bwrite),
       .write(write),
-      .s_init(s_init|s_init_),//TEMP//TEMP//
+      .s_init(s_init),
       .s_fin(s_fin),
       .k_init(k_init),
       .k_fin(k_fin),
@@ -129,6 +133,7 @@ module tiny_dnn_top
       .os(os[9:0]),
       .oh(oh[4:0]),
       .ow(ow[4:0]),
+      .fs(fs[7:0]),
       .kh(kh[2:0]),
       .kw(kw[2:0])
    );
@@ -140,12 +145,13 @@ module tiny_dnn_top
                (
                 .clk(clk),
                 .init(k_init),
-                .write(write&(wa[12:9] == i)),
+                .write((wwrite|bwrite)&(wa[12:9] == i)),
+                .bwrite(bwrite),
                 .exec(exec),
                 .bias(k_fin),
                 .a(wa[8:0]),
                 .d(d),
-                .dd(dd), //TEMP//TEMP//
+                .wd(src_data),
                 .sum(sum[i])
                 );
       end
@@ -245,18 +251,21 @@ endmodule
 module sample_ctrl
   (
    input wire        clk,
-   input wire        s_init,
-   output reg        k_init,
-   output reg        s_fin,
    input wire        init,
+   input wire        run,
+   input wire        wwrite,
+   input wire        bwrite,
    input wire        write,
-   output reg        exec,
-   output reg        outr,
-   output reg [12:0] wa,
-   output reg [12:0] ia,
-   output reg [3:0]  ra,
-   output reg [12:0] oa,
+   input wire        s_init,
+   output reg        s_fin,
+   output reg        k_init,
    output reg        k_fin,
+   output reg        exec,
+   output reg [12:0] ia,
+   output reg        outr,
+   output reg [12:0] oa,
+   output reg [12:0] wa,
+   output reg [3:0]  ra,
    input wire [3:0]  id,
    input wire [9:0]  is,
    input wire [4:0]  ih,
@@ -265,6 +274,7 @@ module sample_ctrl
    input wire [9:0]  os,
    input wire [4:0]  oh,
    input wire [4:0]  ow,
+   input wire [7:0]  fs,
    input wire [2:0]  kh,
    input wire [2:0]  kw
    );
@@ -281,15 +291,13 @@ module sample_ctrl
 
    reg [12:0] iac;
 
-   reg [3:0] outc;
-   reg [9:0] outp;
-   reg       outrp;
+   reg [3:0]  outc;
+   reg [9:0]  outp;
+   reg        outrp;
 
    always_ff @(posedge clk)begin
       if(s_init)begin
-         wa <= (wa+f_size)&~(f_size-1);
-         //k_init <= 1'b1;
-         k_init <= ~write;
+         k_init <= 1'b1;
       end else if(k_init|init)begin
          k_init <= 1'b0;
          exec <= k_init;
@@ -300,7 +308,9 @@ module sample_ctrl
          ia <= ka;
          iac <= ka;
          k_fin <= 1'b0;
-      end else if(exec|write)begin
+      end else if(bwrite | wwrite&((wa&(f_size-1))==fs))begin
+         wa <= (wa+f_size)&~(f_size-1);
+      end else if(exec|wwrite)begin
          wa <= wa+1;
          if(wx != kw)begin
             wx <= wx +1;
@@ -383,11 +393,12 @@ module tiny_dnn_core
    input wire       clk,
    input wire       init,
    input wire       write,
+   input wire       bwrite,
    input wire       exec,
    input wire       bias,
    input wire [8:0] a,
    input real       d,
-   input real       dd, //TEMP//TEMP//
+   input real       wd,
    output real      sum
    );
 
@@ -397,20 +408,22 @@ module tiny_dnn_core
    real          w;
    reg           exec1,bias1;
 
+   wire [8:0]    adr = (bwrite|bias) ? f_size-1 : a ;
+
    always_ff @(posedge clk)begin
       if(write)begin
-         W[a] <= d;
+         W[adr] <= wd;
       end
-      if(init)begin
-         sum <= 0;
+      if(exec|bias)begin
+         w <= W[adr];
       end
       exec1 <= exec;
       bias1 <= bias;
-      if(exec|bias)begin
-         w <= W[a];
+      if(init)begin
+         sum <= 0;
       end
       if(exec1)begin
-         sum <= sum + w * dd;
+         sum <= sum + w * d;
       end
       if(bias1)begin
          sum <= sum + w;

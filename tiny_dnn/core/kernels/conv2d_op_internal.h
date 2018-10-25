@@ -52,37 +52,39 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   verilator_top->os = ow*oh;
   verilator_top->oh = oh-1;
   verilator_top->ow = ow-1;
+  verilator_top->fs = kw*kh*id-1;
   verilator_top->kh = kh-1;
   verilator_top->kw = kw-1;
 
-  verilator_top->write = 0;
-  verilator_top->init = 1;
+
+  verilator_top->wwrite = 0;
+  verilator_top->bwrite = 0;
+  verilator_top->run = 0;
+  verilator_top->src_valid = 0;
+  verilator_top->init = 1;//
   eval();
-  verilator_top->init = 0;
+  verilator_top->init = 0;//
 
-  verilator_top->write = 1;
-
-  for (size_t o = 0; o < od; o++) {
-    for (size_t inc = 0; inc < id; inc++) {
-      for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
-        for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
-          verilator_top->d = (double)W[wx + wy*kw + (inc+id*o)*kw*kh];
-          eval();
-        }
-      }
-    }
-    if (params.has_bias) {
-      verilator_top->d = (double)bias[o];
-    }else{
-      verilator_top->d = (double)0;
-    }
+  verilator_top->wwrite = 1;
+  for(size_t i=0;i<od*id*kh*kw;i++){
+    verilator_top->src_data = (double)W[i];
     eval();
-    verilator_top->s_init = 1;
-    eval();
-    verilator_top->s_init = 0;
   }
+  verilator_top->wwrite = 0;
+  verilator_top->init = 1;//
+  eval();
+  verilator_top->init = 0;//
 
-  verilator_top->write = 0;
+  verilator_top->bwrite = 1;
+  for (size_t o = 0; o < od; o++) {
+    if (params.has_bias) {
+      verilator_top->src_data = (double)bias[o];
+    }else{
+      verilator_top->src_data = (double)0;
+    }
+    eval();
+  }
+  verilator_top->bwrite = 0;
 
   // NOT supported parametor
   // params.tbl.is_connected
