@@ -61,21 +61,24 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   verilator_top->bwrite = 0;
   verilator_top->run = 0;
   verilator_top->src_valid = 0;
-  verilator_top->init = 1;//
+  verilator_top->dst_ready = 1;
   eval();
-  verilator_top->init = 0;//
-
+  
   verilator_top->wwrite = 1;
+  eval();
+  verilator_top->src_valid = 1;
   for(size_t i=0;i<od*id*kh*kw;i++){
     verilator_top->src_data = (double)W[i];
     eval();
   }
-  verilator_top->wwrite = 0;
-  verilator_top->init = 1;//
+  verilator_top->src_valid = 0;
   eval();
-  verilator_top->init = 0;//
+  verilator_top->wwrite = 0;
+  eval();
 
   verilator_top->bwrite = 1;
+  eval();
+  verilator_top->src_valid = 1;
   for (size_t o = 0; o < od; o++) {
     if (params.has_bias) {
       verilator_top->src_data = (double)bias[o];
@@ -84,39 +87,46 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     }
     eval();
   }
+  verilator_top->src_valid = 0;
+  eval();
   verilator_top->bwrite = 0;
+  eval();
 
   // NOT supported parametor
   // params.tbl.is_connected
   // params.w_stride
   // params.h_stride
   if(in_data.size()>1){
+    verilator_top->run = 1;
+    eval();
+    verilator_top->src_valid = 1;
+
     for (size_t sample = 0; sample < in_data.size(); sample++) {
+      size_t ina=0;
+      size_t outa=0;
       const vec_t &in = in_data[sample];
       vec_t &a        = out_data[sample];
 
-      //   input wire         src_valid,
-      //   input real         src_data,
-      //   input wire         src_last,
-      //   output wire        src_ready,
-
-      verilator_top->src_valid = 1;
-      for(size_t i=0;i<iw*ih*id;i++){
-        verilator_top->src_data = in[i];
-        eval();
-      }
-      verilator_top->src_valid = 0;
-
       while(!verilator_top->dst_valid) {
+        if(verilator_top->src_ready){
+          verilator_top->src_data = in[ina++];
+        }
         eval();
       }
       
-      for(size_t i=0;verilator_top->dst_valid;i++){
-        a[i] = (float)verilator_top->dst_data;
+      while(verilator_top->dst_valid){
+        a[outa++] = (float)verilator_top->dst_data;
         eval();
+        if((outa%1024==0)&verilator_top->dst_valid){
+          verilator_top->dst_ready = 0;
+          eval();
+          verilator_top->dst_ready = 1;
+        }
       }
-
     }
+
+    verilator_top->src_valid = 0;
+    verilator_top->run = 0;
   }else{
     for (size_t sample = 0; sample < in_data.size(); sample++) {
       const vec_t &in = in_data[sample];

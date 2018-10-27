@@ -16,8 +16,6 @@ module tiny_dnn_top
    output wire       dst_last,
    input wire        dst_ready,
 
-   input wire        init,
-
    input wire [11:0] ss,
    input wire [3:0]  id,
    input wire [9:0]  is,
@@ -73,12 +71,14 @@ module tiny_dnn_top
       .clk(clk),
       .s_init(s_init),
       .s_fin(s_fin),
+      .run(run),
       .src_valid(src_valid),
       .src_last(src_last),
       .src_ready(src_ready),
       .src_v(src_v),
       .src_a(src_a[11:0]),
       .dst_valid(dst_valid),
+      .dst_ready(dst_ready),
       .dst_v(dst_v),
       .dst_a(dst_a[11:0]),
       .ss(ss[11:0]),
@@ -110,11 +110,11 @@ module tiny_dnn_top
    sample_ctrl sample_ctrl
      (
       .clk(clk),
-      .init(init),
+      .src_valid(src_valid),
+      .src_ready(src_ready),
       .run(run),
       .wwrite(wwrite),
       .bwrite(bwrite),
-      .write(write),
       .s_init(s_init),
       .s_fin(s_fin),
       .k_init(k_init),
@@ -145,7 +145,7 @@ module tiny_dnn_top
                (
                 .clk(clk),
                 .init(k_init),
-                .write((wwrite|bwrite)&(wa[12:9] == i)),
+                .write((wwrite|bwrite)&(wa[12:9] == i) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
                 .bias(k_fin),
@@ -164,41 +164,59 @@ module batch_ctrl
    input wire        clk,
    output wire       s_init,
    input wire        s_fin,
+   input wire        run,
    input wire        src_valid,
    input wire        src_last,
-   output wire       src_ready,
+   output reg        src_ready,
    output wire       src_v,
    output reg [11:0] src_a,
    output reg        dst_valid,
-   output reg        dst_v,
+   input wire        dst_ready,
+   output wire       dst_v,
    output reg [11:0] dst_a,
 
    input wire [11:0] ss,
    input wire [11:0] ds
    );
-   assign src_v = src_valid;
-   assign src_ready = 1'b1;
+   reg               dst_vi;
+   assign dst_v = dst_vi & dst_ready;
+
+   assign src_v = run & src_valid & src_ready;
  
    always_ff @(posedge clk)begin
-      if(~src_valid)begin//TEMP//TEMP//
+      if(run)begin
+         if(~src_ready)begin
+            src_a <= 0;
+         end else if(src_valid & src_ready) begin
+            src_a <= src_a + 1;
+         end
+         if(src_a==ss)begin
+            s_init <= 1'b1;
+            src_ready <= 1'b0;
+         end else begin
+            s_init <= 1'b0;
+         end
+         if(dst_valid & ~dst_vi)begin
+            src_ready <= 1'b1;
+         end
+      end else begin
          src_a <= 0;
-      end else if(src_valid) begin
-         src_a <= src_a + 1;
+         src_ready <= 1'b1;
       end
-      s_init <= (src_a==ss);
    end
 
    always_ff @(posedge clk)begin
       if(s_fin)begin
          dst_valid <= 1'b1;
-         dst_v <= 1'b1;
+         dst_vi <= 1'b1;
          dst_a <= 0;
       end else if(dst_a!=ds)begin
-         dst_a <= dst_a + 1;
+         if(dst_ready)
+           dst_a <= dst_a + 1;
       end else begin
-         dst_v <= 1'b0;
+         dst_vi <= 1'b0;
       end
-      dst_valid <= dst_v;
+      dst_valid <= dst_vi;
    end
 endmodule
 
@@ -251,11 +269,11 @@ endmodule
 module sample_ctrl
   (
    input wire        clk,
-   input wire        init,
+   input wire        src_valid,
+   input wire        src_ready,
    input wire        run,
    input wire        wwrite,
    input wire        bwrite,
-   input wire        write,
    input wire        s_init,
    output reg        s_fin,
    output reg        k_init,
@@ -295,6 +313,10 @@ module sample_ctrl
    reg [9:0]  outp;
    reg        outrp;
 
+   wire       bwrite_v = bwrite & src_valid & src_ready;
+   wire       wwrite_v = wwrite & src_valid & src_ready;
+   wire       init = (wwrite|bwrite) & ~src_valid;
+
    always_ff @(posedge clk)begin
       if(s_init)begin
          k_init <= 1'b1;
@@ -308,9 +330,9 @@ module sample_ctrl
          ia <= ka;
          iac <= ka;
          k_fin <= 1'b0;
-      end else if(bwrite | wwrite&((wa&(f_size-1))==fs))begin
+      end else if(bwrite_v | wwrite_v&((wa&(f_size-1))==fs))begin
          wa <= (wa+f_size)&~(f_size-1);
-      end else if(exec|wwrite)begin
+      end else if(exec|wwrite_v)begin
          wa <= wa+1;
          if(wx != kw)begin
             wx <= wx +1;
