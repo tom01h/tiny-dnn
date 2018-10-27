@@ -61,8 +61,9 @@ module tiny_dnn_top
    real               d;
    real               sum [0:15];
    real               x;
-   always_comb begin
-      x = sum[ra];
+
+   always_ff @(posedge clk)begin
+      x <= sum[ra];
    end
 
 
@@ -256,9 +257,21 @@ module dst_buf
 
    real              buff [0:4095];
 
+   reg                outrl;
+   reg [11:0]         oal;
+
    always_ff @(posedge clk)begin
       if(outr)begin
-         buff[oa] <= x;
+         outrl <= 1'b1;
+         oal <= oa;
+      end else begin
+         outrl <= 1'b0;
+      end
+   end
+
+   always_ff @(posedge clk)begin
+      if(outrl)begin
+         buff[oal] <= x;
       end
       if(dst_v)begin
          dst_d <= buff[dst_a];
@@ -358,10 +371,12 @@ module sample_ctrl
          k_fin <= 1'b0;
          s_fin <= 1'b0;
          if(outrp&(outc==od))begin
+            if(outp+1!=os)
+              k_init <= 1'b1;
+         end
+         if(outr&(ra==od))begin
             if(outp+1==os)
               s_fin <= 1'b1;
-            else
-              k_init <= 1'b1;
          end
       end
    end
