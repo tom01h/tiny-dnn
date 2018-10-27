@@ -1,34 +1,34 @@
 module tiny_dnn_top
   (
-   input wire        clk,
+   input wire         clk,
 
-   input wire        run,
-   input wire        wwrite,
-   input wire        bwrite,
+   input wire         run,
+   input wire         wwrite,
+   input wire         bwrite,
 
-   input wire        src_valid,
-   input real        src_data,
-   input wire        src_last,
-   output wire       src_ready,
+   input wire         src_valid,
+   input wire [31:0]  src_data,
+   input wire         src_last,
+   output wire        src_ready,
 
-   output wire       dst_valid,
-   output real       dst_data,
-   output wire       dst_last,
-   input wire        dst_ready,
+   output wire        dst_valid,
+   output wire [31:0] dst_data,
+   output wire        dst_last,
+   input wire         dst_ready,
 
-   input wire [11:0] ss,
-   input wire [3:0]  id,
-   input wire [9:0]  is,
-   input wire [4:0]  ih,
-   input wire [4:0]  iw,
-   input wire [11:0] ds,
-   input wire [3:0]  od,
-   input wire [9:0]  os,
-   input wire [4:0]  oh,
-   input wire [4:0]  ow,
-   input wire [7:0]  fs,
-   input wire [2:0]  kh,
-   input wire [2:0]  kw
+   input wire [11:0]  ss,
+   input wire [3:0]   id,
+   input wire [9:0]   is,
+   input wire [4:0]   ih,
+   input wire [4:0]   iw,
+   input wire [11:0]  ds,
+   input wire [3:0]   od,
+   input wire [9:0]   os,
+   input wire [4:0]   oh,
+   input wire [4:0]   ow,
+   input wire [7:0]   fs,
+   input wire [2:0]   kh,
+   input wire [2:0]   kw
    );
 
    parameter f_num  = 16;
@@ -58,14 +58,8 @@ module tiny_dnn_top
    wire [11:0]        dst_a;
 
    // core <-> src,dst buffer
-   real               d;
-   real               sum [0:15];
-   real               x;
-
-   always_ff @(posedge clk)begin
-      x <= sum[ra];
-   end
-
+   wire [15:0]        d;
+   wire [31:0]        x;
 
    batch_ctrl batch_ctrl
      (
@@ -91,7 +85,7 @@ module tiny_dnn_top
       .clk(clk),
       .src_v(src_v),
       .src_a(src_a[11:0]),
-      .src_d(src_data),
+      .src_d(src_data[31:16]),
       .exec(exec|k_init),
       .ia(ia[11:0]),
       .d(d)
@@ -137,7 +131,26 @@ module tiny_dnn_top
       .fs(fs[7:0]),
       .kh(kh[2:0]),
       .kw(kw[2:0])
-   );
+      );
+
+   wire               signo [0:15];
+   wire signed [9:0]  expo [0:15];
+   wire signed [31:0] addo [0:15];
+   wire [31:0]        nrm;
+
+   always_comb begin
+      x = nrm;
+   end
+
+   normalize normalize
+     (
+      .clk(clk),
+      .en(outr),
+      .signo(signo[ra]),
+      .expo(expo[ra]),
+      .addo(addo[ra]),
+      .nrm(nrm)
+      );
 
    generate
       genvar i;
@@ -152,8 +165,10 @@ module tiny_dnn_top
                 .bias(k_fin),
                 .a(wa[8:0]),
                 .d(d),
-                .wd(src_data),
-                .sum(sum[i])
+                .wd(src_data[31:16]),
+                .signo(signo[i]),
+                .expo(expo[i]),
+                .addo(addo[i])
                 );
       end
    endgenerate
@@ -183,7 +198,7 @@ module batch_ctrl
    assign dst_v = dst_vi & dst_ready;
 
    assign src_v = run & src_valid & src_ready;
- 
+   
    always_ff @(posedge clk)begin
       if(run)begin
          if(~src_ready)begin
@@ -208,7 +223,6 @@ module batch_ctrl
 
    always_ff @(posedge clk)begin
       if(s_fin)begin
-         dst_valid <= 1'b1;
          dst_vi <= 1'b1;
          dst_a <= 0;
       end else if(dst_a!=ds)begin
@@ -223,16 +237,16 @@ endmodule
 
 module src_buf
   (
-   input wire        clk,
-   input wire        src_v,
-   input wire [11:0] src_a,
-   input real        src_d,
-   input wire        exec,
-   input wire [11:0] ia,
-   output real       d
+   input wire         clk,
+   input wire         src_v,
+   input wire [11:0]  src_a,
+   input wire [15:0]  src_d,
+   input wire         exec,
+   input wire [11:0]  ia,
+   output wire [15:0] d
    );
 
-   real              buff [0:4095];
+   wire [15:0]        buff [0:4095];
 
    always_ff @(posedge clk)begin
       if(src_v)begin
@@ -246,16 +260,16 @@ endmodule
 
 module dst_buf
   (
-   input wire        clk,
-   input wire        dst_v,
-   input wire [11:0] dst_a,
-   output real       dst_d,
-   input wire        outr,
-   input wire [11:0] oa,
-   input real        x
+   input wire         clk,
+   input wire         dst_v,
+   input wire [11:0]  dst_a,
+   output wire [31:0] dst_d,
+   input wire         outr,
+   input wire [11:0]  oa,
+   input wire [31:0]  x
    );
 
-   real              buff [0:4095];
+   wire [31:0]        buff [0:4095];
 
    reg                outrl;
    reg [11:0]         oal;
@@ -420,50 +434,6 @@ module sample_ctrl
          outc <= outc+1;
       end else begin
          outrp <= 1'b0;
-      end
-   end
-
-endmodule
-
-module tiny_dnn_core
-  (
-   input wire       clk,
-   input wire       init,
-   input wire       write,
-   input wire       bwrite,
-   input wire       exec,
-   input wire       bias,
-   input wire [8:0] a,
-   input real       d,
-   input real       wd,
-   output real      sum
-   );
-
-   parameter f_size = 512;
-
-   real          W [0:f_size-1];
-   real          w;
-   reg           exec1,bias1;
-
-   wire [8:0]    adr = (bwrite|bias) ? f_size-1 : a ;
-
-   always_ff @(posedge clk)begin
-      if(write)begin
-         W[adr] <= wd;
-      end
-      if(exec|bias)begin
-         w <= W[adr];
-      end
-      exec1 <= exec;
-      bias1 <= bias;
-      if(init)begin
-         sum <= 0;
-      end
-      if(exec1)begin
-         sum <= sum + w * d;
-      end
-      if(bias1)begin
-         sum <= sum + w;
       end
    end
 
