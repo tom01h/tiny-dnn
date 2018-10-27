@@ -5,14 +5,9 @@
     Use of this source code is governed by a BSD-style license that can be found
     in the LICENSE file.
 */
-
-extern int address;
-
-#define WEIGHT (address+0x00000000)
-#define EXEC   (address+0x00008000)
-#define INIT   (address+0x0000fffc)
-
-#define REG(reg_addr) *(volatile float*)(reg_addr)
+#include "Vtiny_dnn_top.h"
+extern Vtiny_dnn_top* verilator_top;
+extern void eval();
 
 #pragma once
 
@@ -47,44 +42,91 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   size_t line_stride = iw * params.h_stride;
   size_t filter_size = 512;
 
-  for (size_t o = 0; o < od; o++) {
-    for (size_t inc = 0; inc < id; inc++) {
-      for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
-        for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
-          REG(WEIGHT+ (wx + wy*kw + inc*kw*kh + o*filter_size)*4) = W[wx + wy*kw + (inc+id*o)*kw*kh];
-        }
-      }
-    }
-  }
+  verilator_top->ss = iw*ih*id-1;
+  verilator_top->id = id-1;
+  verilator_top->is = iw*ih;
+  verilator_top->ih = ih-1;
+  verilator_top->iw = iw-1;
+  verilator_top->ds = ow*oh*od-1;
+  verilator_top->od = od-1;
+  verilator_top->os = ow*oh;
+  verilator_top->oh = oh-1;
+  verilator_top->ow = ow-1;
+  verilator_top->fs = kw*kh*id-1;
+  verilator_top->kh = kh-1;
+  verilator_top->kw = kw-1;
 
-  //if (!params.tbl.is_connected(o, inc)) continue;
+
+  verilator_top->wwrite = 0;
+  verilator_top->bwrite = 0;
+  verilator_top->run = 0;
+  verilator_top->src_valid = 0;
+  verilator_top->dst_ready = 1;
+  eval();
+  
+  verilator_top->wwrite = 1;
+  eval();
+  verilator_top->src_valid = 1;
+  for(size_t i=0;i<od*id*kh*kw;i++){
+    verilator_top->src_data = (double)W[i];
+    eval();
+  }
+  verilator_top->src_valid = 0;
+  eval();
+  verilator_top->wwrite = 0;
+  eval();
+
+  verilator_top->bwrite = 1;
+  eval();
+  verilator_top->src_valid = 1;
+  for (size_t o = 0; o < od; o++) {
+    if (params.has_bias) {
+      verilator_top->src_data = (double)bias[o];
+    }else{
+      verilator_top->src_data = (double)0;
+    }
+    eval();
+  }
+  verilator_top->src_valid = 0;
+  eval();
+  verilator_top->bwrite = 0;
+  eval();
+
+  // NOT supported parametor
+  // params.tbl.is_connected
+  // params.w_stride
+  // params.h_stride
   if(in_data.size()>1){
+    verilator_top->run = 1;
+    eval();
+    verilator_top->src_valid = 1;
+
     for (size_t sample = 0; sample < in_data.size(); sample++) {
+      size_t ina=0;
+      size_t outa=0;
       const vec_t &in = in_data[sample];
       vec_t &a        = out_data[sample];
-      for (size_t y = 0; y < oh; y++) {
-        for (size_t x = 0; x < ow; x++) {
-          REG(INIT) = 0;
-          for (size_t inc = 0; inc < id; inc++) {
-            for (size_t wy = 0; wy < kh; wy++) {    // NOLINT
-              for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
-                REG(EXEC + (wx + wy*kw + inc*kw*kh)*4) =
-                  in[wx + wy*iw + x*elem_stride + y*line_stride + inc*iw*ih];
-              }
-            }
-          }
 
-          for (size_t o = 0; o < od; o++) {
-            if (params.has_bias) {
-              a[x + y*ow + o*ow*oh] = REG(EXEC + o*4) + bias[o];
-            }else{
-              a[x + y*ow + o*ow*oh] = REG(EXEC + o*4);
-            }
-          }
-
+      while(!verilator_top->dst_valid) {
+        if(verilator_top->src_ready){
+          verilator_top->src_data = in[ina++];
+        }
+        eval();
+      }
+      
+      while(verilator_top->dst_valid){
+        a[outa++] = (float)verilator_top->dst_data;
+        eval();
+        if((outa%1024==0)&verilator_top->dst_valid){
+          verilator_top->dst_ready = 0;
+          eval();
+          verilator_top->dst_ready = 1;
         }
       }
     }
+
+    verilator_top->src_valid = 0;
+    verilator_top->run = 0;
   }else{
     for (size_t sample = 0; sample < in_data.size(); sample++) {
       const vec_t &in = in_data[sample];

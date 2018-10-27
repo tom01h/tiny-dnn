@@ -6,12 +6,41 @@
     in the LICENSE file.
 */
 
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/mman.h>
+// verilator
+#include "unistd.h"
+#include "getopt.h"
+#include "Vtiny_dnn_top.h"
+#include "verilated.h"
+#include "verilated_vcd_c.h"
 
-#define DNN_BASE   (0x40000000)
-int address;
+#define VCD_PATH_LENGTH 256
+
+vluint64_t main_time = 0;
+vluint64_t vcdstart = 0;
+vluint64_t vcdend = 300000;
+
+VerilatedVcdC* tfp;
+Vtiny_dnn_top* verilator_top;
+
+void eval()
+{
+  verilator_top->clk = 0;
+  verilator_top->eval();
+  if((main_time>=vcdstart)&((main_time<vcdend)|(vcdend==0)))
+    tfp->dump(main_time);
+
+  main_time += 5;
+
+  verilator_top->clk = 1;
+  verilator_top->eval();
+  if((main_time>=vcdstart)&((main_time<vcdend)|(vcdend==0)))
+    tfp->dump(main_time);
+
+  main_time += 5;
+
+  return;
+}
+// verilator
 
 #include <iostream>
 
@@ -66,12 +95,12 @@ static void train_net(const std::string &data_dir_path,
   tiny_dnn::parse_mnist_images(data_dir_path + "/t10k-images.idx3-ubyte",
                                &test_images, -1.0, 1.0, 0, 0);
 
-  train_labels.resize(20000);
-  train_images.resize(20000);
-  //train_labels.resize(3008);
-  //train_images.resize(3008);
-  //test_labels.resize(1000);
-  //test_images.resize(1000);
+  train_labels.resize(3008);
+  train_images.resize(3008);
+  //train_labels.resize(20000);
+  //train_images.resize(20000);
+  //train_labels.resize(32);
+  //train_images.resize(32);
 
   std::cout << "start training" << std::endl;
 
@@ -137,22 +166,6 @@ int main(int argc, char **argv) {
   int minibatch_size                     = 16;
   tiny_dnn::core::backend_t backend_type = tiny_dnn::core::default_engine();
 
-  int fd;
-
-  /* メモリアクセス用のデバイスファイルを開く */
-  if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) < 0) {
-    perror("open");
-    return -1;
-  }
-
-  /* ARM(CPU)から見た物理アドレス → 仮想アドレスへのマッピング */
-  address = (int)mmap(NULL, 0x10000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, DNN_BASE);
-  if (address == (int)MAP_FAILED) {
-    perror("mmap");
-    close(fd);
-    return -1;
-  }
-
   if (argc == 2) {
     std::string argname(argv[1]);
     if (argname == "--help" || argname == "-h") {
@@ -179,6 +192,18 @@ int main(int argc, char **argv) {
       return -1;
     }
   }
+
+// verilator
+  char vcdfile[VCD_PATH_LENGTH];
+  strncpy(vcdfile,"tmp.vcd",VCD_PATH_LENGTH);
+  Verilated::commandArgs(argc, argv);
+  Verilated::traceEverOn(true);
+  tfp = new VerilatedVcdC;
+  verilator_top = new Vtiny_dnn_top;
+  verilator_top->trace(tfp, 99); // requires explicit max levels param
+  tfp->open(vcdfile);
+  main_time = 0;
+// verilator
 
   if (data_path == "") {
     std::cerr << "Data path not specified." << std::endl;
@@ -216,5 +241,7 @@ int main(int argc, char **argv) {
   } catch (tiny_dnn::nn_error &err) {
     std::cerr << "Exception: " << err.what() << std::endl;
   }
+  delete verilator_top;
+  tfp->close();
   return 0;
 }
