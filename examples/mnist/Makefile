@@ -19,6 +19,9 @@ VERILATOR_MAKE_OPTS = OPT="-Wall -Wpedantic -Wno-narrowing -Wno-deprecated -O3 -
 
 DESIGN_SRCS = \
 tiny_dnn_top.sv \
+tiny_dnn_control.sv \
+tiny_dnn_buf.sv \
+tiny_dnn_core.sv \
 
 VERILATOR_CPP_TB = train.cpp
 
