@@ -1,147 +1,250 @@
 module tiny_dnn_top
   (
-    input wire         S_AXI_ACLK,
-    input wire         S_AXI_ARESETN,
+   input wire         S_AXI_ACLK,
+   input wire         S_AXI_ARESETN,
 
-    ////////////////////////////////////////////////////////////////////////////
-    // AXI Lite Slave Interface
-    input wire [31:0]  S_AXI_AWADDR,
-    input wire         S_AXI_AWVALID,
-    output wire        S_AXI_AWREADY,
-    input wire [31:0]  S_AXI_WDATA,
-    input wire [3:0]   S_AXI_WSTRB,
-    input wire         S_AXI_WVALID,
-    output wire        S_AXI_WREADY,
-    output wire [1:0]  S_AXI_BRESP,
-    output wire        S_AXI_BVALID,
-    input wire         S_AXI_BREADY,
+   ////////////////////////////////////////////////////////////////////////////
+   // AXI Lite Slave Interface
+   input wire [31:0]  S_AXI_AWADDR,
+   input wire         S_AXI_AWVALID,
+   output wire        S_AXI_AWREADY,
+   input wire [31:0]  S_AXI_WDATA,
+   input wire [3:0]   S_AXI_WSTRB,
+   input wire         S_AXI_WVALID,
+   output wire        S_AXI_WREADY,
+   output wire [1:0]  S_AXI_BRESP,
+   output wire        S_AXI_BVALID,
+   input wire         S_AXI_BREADY,
 
-    input wire [31:0]  S_AXI_ARADDR,
-    input wire         S_AXI_ARVALID,
-    output wire        S_AXI_ARREADY,
-    output wire [31:0] S_AXI_RDATA,
-    output wire [1:0]  S_AXI_RRESP,
-    output wire        S_AXI_RVALID,
-    input wire         S_AXI_RREADY
-    );
+   input wire [31:0]  S_AXI_ARADDR,
+   input wire         S_AXI_ARVALID,
+   output wire        S_AXI_ARREADY,
+   output wire [31:0] S_AXI_RDATA,
+   output wire [1:0]  S_AXI_RRESP,
+   output wire        S_AXI_RVALID,
+   input wire         S_AXI_RREADY,
 
-   reg [3:0]           axist;
-   reg [15:2]          wb_adr_i;
-   reg [31:16]         wb_dat_i_storage;
+   input wire         AXIS_ACLK,
+   input wire         AXIS_ARESETN,
 
-   assign S_AXI_BRESP = 2'b00;
-   assign S_AXI_RRESP = 2'b00;
-   assign S_AXI_AWREADY = (axist == 4'b0000)|(axist == 4'b0010);
-   assign S_AXI_WREADY  = (axist == 4'b0000)|(axist == 4'b0001);
-   assign S_AXI_ARREADY = (axist == 4'b0000);
-   assign S_AXI_BVALID  = (axist == 4'b0011);
-   assign S_AXI_RVALID  = (axist == 4'b0100);
+   ////////////////////////////////////////////////////////////////////////////
+   // AXI Stream Master Interface
+   output wire        M_AXIS_TVALID,
+   output wire [31:0] M_AXIS_TDATA,
+   output wire [3:0]  M_AXIS_TSTRB,
+   output wire        M_AXIS_TLAST,
+   input wire         M_AXIS_TREADY,
 
-   wire [0:15]         busy;
-
-   always @(posedge S_AXI_ACLK)begin
-      if(~S_AXI_ARESETN)begin
-         axist<=4'b0000;
-
-         wb_adr_i<=0;
-         wb_dat_i_storage<=0;
-      end else if(axist==4'b000)begin
-         if(S_AXI_AWVALID & S_AXI_WVALID)begin
-            axist<=4'b00011;
-            wb_adr_i[15:2]<=S_AXI_AWADDR[15:2];
-            wb_dat_i_storage<=S_AXI_WDATA[31:16];
-         end else if(S_AXI_AWVALID)begin
-            axist<=4'b0001;
-            wb_adr_i[15:2]<=S_AXI_AWADDR[15:2];
-         end else if(S_AXI_WVALID)begin
-            axist<=4'b0010;
-            wb_dat_i_storage<=S_AXI_WDATA[31:16];
-         end else if(S_AXI_ARVALID)begin
-            if(busy[0:15]==0)
-              axist<=4'b0100;
-            else
-              axist<=4'b1100;
-         end
-      end else if(axist==4'b0001)begin
-         if(S_AXI_WVALID)begin
-            axist<=4'b0011;
-            wb_dat_i_storage<=S_AXI_WDATA[31:16];
-         end
-      end else if(axist==4'b0010)begin
-         if(S_AXI_AWVALID)begin
-            axist<=4'b0011;
-            wb_adr_i[15:2]<=S_AXI_AWADDR[15:2];
-         end
-      end else if(axist==4'b0011)begin
-         if(S_AXI_BREADY)
-           axist<=4'b0000;
-      end else if(axist==4'b0100)begin
-         if(S_AXI_RREADY)
-           axist<=4'b0000;
-      end else if(axist==4'b1100)begin
-         if(busy[0:15]==0)
-           axist<=4'b0100;
-      end
-   end
-
-
+   ////////////////////////////////////////////////////////////////////////////
+   // AXI Stream Slave Interface
+   output wire        S_AXIS_TREADY,
+   input wire [31:0]  S_AXIS_TDATA,
+   input wire [3:0]   S_AXIS_TSTRB,
+   input wire         S_AXIS_TLAST,
+   input wire         S_AXIS_TVALID
+   );
 
    parameter f_num  = 16;
 
-   wire [12:0] a = (S_AXI_ARVALID & (busy[0:15]==0)) ? S_AXI_ARADDR[14:2] : wb_adr_i[14:2];
+   wire               clk = AXIS_ACLK;
 
-   wire        readw = S_AXI_ARVALID & S_AXI_ARREADY & (busy[0:15]==0) & (S_AXI_ARADDR[15]==1'b0);
-   wire        nrmen = S_AXI_ARVALID & S_AXI_ARREADY & (busy[0:15]==0) & (S_AXI_ARADDR[15]==1'b1);
-   wire        write = (axist==4'b0011) & S_AXI_BREADY & (wb_adr_i[15]==1'b0);
-   wire        init  = (axist==4'b0011) & S_AXI_BREADY & ({wb_adr_i[15:2],2'b00}==16'hfffc);
-   wire        exec  = (axist==4'b0011) & S_AXI_BREADY & (wb_adr_i[15:11]==5'h10);
-   
+   wire               src_ready;
+   wire [31:0]        dst_data;
+   wire               dst_valid;
+
+   wire               src_valid = S_AXIS_TVALID;
+   wire [31:0]        src_data  = S_AXIS_TDATA;
+   wire               src_last  = S_AXIS_TLAST;
+   assign             S_AXIS_TREADY = src_ready;
+
+   assign             M_AXIS_TVALID = dst_valid;
+   assign             M_AXIS_TDATA  = dst_data;
+   assign             M_AXIS_TSTRB  = {4{dst_valid}};
+// assign             M_AXIS_TLAST  = dst_last;
+   assign             M_AXIS_TLAST  = 1'b0;
+   wire               dst_ready = M_AXIS_TREADY;
+
+
+   wire               run;
+   wire               wwrite;
+   wire               bwrite;
+
+   wire [11:0]        ss;
+   wire [3:0]         id;
+   wire [9:0]         is;
+   wire [4:0]         ih;
+   wire [4:0]         iw;
+   wire [11:0]        ds;
+   wire [3:0]         od;
+   wire [9:0]         os;
+   wire [4:0]         oh;
+   wire [4:0]         ow;
+   wire [7:0]         fs;
+   wire [2:0]         kh;
+   wire [2:0]         kw;
+
+
+   tiny_dnn_reg tiny_dnn_reg
+     (
+      .S_AXI_ACLK(S_AXI_ACLK),
+      .S_AXI_ARESETN(S_AXI_ARESETN),
+
+      .S_AXI_AWADDR(S_AXI_AWADDR),
+      .S_AXI_AWVALID(S_AXI_AWVALID),
+      .S_AXI_AWREADY(S_AXI_AWREADY),
+      .S_AXI_WDATA(S_AXI_WDATA),
+      .S_AXI_WSTRB(S_AXI_WSTRB),
+      .S_AXI_WVALID(S_AXI_WVALID),
+      .S_AXI_WREADY(S_AXI_WREADY),
+      .S_AXI_BRESP(S_AXI_BRESP),
+      .S_AXI_BVALID(S_AXI_BVALID),
+      .S_AXI_BREADY(S_AXI_BREADY),
+
+      .S_AXI_ARADDR(S_AXI_ARADDR),
+      .S_AXI_ARVALID(S_AXI_ARVALID),
+      .S_AXI_ARREADY(S_AXI_ARREADY),
+      .S_AXI_RDATA(S_AXI_RDATA),
+      .S_AXI_RRESP(S_AXI_RRESP),
+      .S_AXI_RVALID(S_AXI_RVALID),
+      .S_AXI_RREADY(S_AXI_RREADY),
+
+      .run(run), .wwrite(wwrite), .bwrite(bwrite),
+      .ss(ss), .id(id), .is(is), .ih(ih), .iw(iw),
+      .ds(ds), .od(od), .os(os), .oh(oh), .ow(ow),
+      .fs(fs), .kh(kh), .kw(kw)
+      );
+
+   //  batch control <-> sample control
+   wire               s_init;
+   wire               s_fin;
+
+   // sample control -> core
+   wire               k_init;
+   wire               k_fin;
+   wire [12:0]        wa;
+   wire [3:0]         ra;
+
+   // sample control -> core, src buffer
+   wire               exec;
+   wire [11:0]        ia;
+   // sample control -> core, dst buffer
+   wire               outr;
+   wire [11:0]        oa;
+
+   // batch control -> src buffer
+   wire               src_v;
+   wire [11:0]        src_a;
+   // batch control -> dst buffer
+   wire               dst_v;
+   wire [11:0]        dst_a;
+
+   // core <-> src,dst buffer
+   wire [15:0]        d;
+   wire [31:0]        x;
+
+   batch_ctrl batch_ctrl
+     (
+      .clk(clk),
+      .s_init(s_init),
+      .s_fin(s_fin),
+      .run(run),
+      .src_valid(src_valid),
+      .src_last(src_last),
+      .src_ready(src_ready),
+      .src_v(src_v),
+      .src_a(src_a[11:0]),
+      .dst_valid(dst_valid),
+      .dst_ready(dst_ready),
+      .dst_v(dst_v),
+      .dst_a(dst_a[11:0]),
+      .ss(ss[11:0]),
+      .ds(ds[11:0])
+      );
+
+   src_buf src_buf
+     (
+      .clk(clk),
+      .src_v(src_v),
+      .src_a(src_a[11:0]),
+      .src_d(src_data[31:16]),
+      .exec(exec|k_init),
+      .ia(ia[11:0]),
+      .d(d)
+      );
+
+   dst_buf dst_buf
+     (
+      .clk(clk),
+      .dst_v(dst_v),
+      .dst_a(dst_a[11:0]),
+      .dst_d(dst_data),
+      .outr(outr),
+      .oa(oa[11:0]),
+      .x(x)
+      );
+
+   sample_ctrl sample_ctrl
+     (
+      .clk(clk),
+      .src_valid(src_valid),
+      .src_ready(src_ready),
+      .run(run),
+      .wwrite(wwrite),
+      .bwrite(bwrite),
+      .s_init(s_init),
+      .s_fin(s_fin),
+      .k_init(k_init),
+      .k_fin(k_fin),
+      .exec(exec),
+      .ia(ia[11:0]),
+      .outr(outr),
+      .oa(oa[11:0]),
+      .wa(wa[12:0]),
+      .ra(ra[3:0]),
+      .id(id[3:0]),
+      .is(is[9:0]),
+      .ih(ih[4:0]),
+      .iw(iw[4:0]),
+      .od(od[3:0]),
+      .os(os[9:0]),
+      .oh(oh[4:0]),
+      .ow(ow[4:0]),
+      .fs(fs[7:0]),
+      .kh(kh[2:0]),
+      .kw(kw[2:0])
+      );
+
    wire               signo [0:15];
    wire signed [9:0]  expo [0:15];
    wire signed [31:0] addo [0:15];
-
    wire [31:0]        nrm;
-   wire [15:0]        w [0:15];
 
-   reg                read_l;
-   reg [3:0]          a_l;
-   
-   always @(posedge S_AXI_ACLK)begin
-      if(~S_AXI_ARESETN)begin
-         a_l <= 4'h0;
-      end else if(S_AXI_RREADY)begin
-         read_l <= readw;
-         if(readw)
-           a_l <= a[12:9];
-      end
-   end
-
-   assign S_AXI_RDATA = (read_l) ? {16'h0,w[a_l]} : nrm;
+   assign x = nrm;
 
    normalize normalize
      (
-      .clk(S_AXI_ACLK),
-      .en(nrmen),
-      .signo(signo[S_AXI_ARADDR[5:2]]),
-      .expo(expo[S_AXI_ARADDR[5:2]]),
-      .addo(addo[S_AXI_ARADDR[5:2]]),
+      .clk(clk),
+      .en(outr),
+      .signo(signo[ra]),
+      .expo(expo[ra]),
+      .addo(addo[ra]),
       .nrm(nrm)
-   );
+      );
 
    generate
       genvar i;
       for (i = 0; i < f_num; i = i + 1) begin
          tiny_dnn_core tiny_dnn_core
                (
-                .clk(S_AXI_ACLK),
-                .write(write&(a[12:9] == i)),
-                .read(readw&(a[12:9] == i)),
-                .init(init),
+                .clk(clk),
+                .init(k_init),
+                .write((wwrite|bwrite)&(wa[12:9] == i) & src_valid & src_ready),
+                .bwrite(bwrite),
                 .exec(exec),
-                .a(a[8:0]),
-                .d(wb_dat_i_storage[31:16]),
-                .busy(busy[i]),
-                .w(w[i]),
+                .bias(k_fin),
+                .a(wa[8:0]),
+                .d(d),
+                .wd(src_data[31:16]),
                 .signo(signo[i]),
                 .expo(expo[i]),
                 .addo(addo[i])

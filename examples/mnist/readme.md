@@ -45,7 +45,9 @@ $ sim/Vtiny_dnn_top --data_path ../../data/ --learning_rate 1 --epochs 1 --minib
 
 ## FPGA で動かすには
 
-まだ動きません…
+Verilog ファイルは ```CORA/tiny_dnn_top.v, tiny_dnn_reg.v``` と ```examples/mnist/tiny_dnn_buf.sv, tiny_dnn_control.sv, tiny_dnn_core.sv``` を使います。
+
+実行するプログラムは ```CORA/conv2d_op_internal.h, train.cpp``` で ```tiny_dnn/core/kernels/, examples/mnist/``` を上書きします。  
 
 ## 使っている NN モデル
 こんな感じ。  
