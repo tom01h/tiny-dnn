@@ -1,7 +1,7 @@
 module batch_ctrl
   (
    input wire        clk,
-   output wire       s_init,
+   output reg        s_init,
    input wire        s_fin,
    input wire        run,
    input wire        src_valid,
@@ -17,13 +17,18 @@ module batch_ctrl
    input wire [11:0] ss,
    input wire [11:0] ds
    );
+
    reg               dst_vi;
    assign dst_v = dst_vi & dst_ready;
 
    assign src_v = run & src_valid & src_ready;
  
    always_ff @(posedge clk)begin
-      if(run)begin
+      if(~run)begin
+         src_a <= 0;
+         s_init <= 1'b0;
+         src_ready <= 1'b1;
+      end else begin
          if(~src_ready)begin
             src_a <= 0;
          end else if(src_valid & src_ready) begin
@@ -38,19 +43,18 @@ module batch_ctrl
          if(dst_valid & ~dst_vi)begin
             src_ready <= 1'b1;
          end
-      end else begin
-         src_a <= 0;
-         src_ready <= 1'b1;
       end
    end
 
    always_ff @(posedge clk)begin
-      if(s_fin)begin
-         dst_valid <= 1'b1;
+      if(~run)begin
+         dst_vi <= 1'b0;
+         dst_a <= 0;
+      end else if(s_fin)begin
          dst_vi <= 1'b1;
          dst_a <= 0;
       end else if(dst_a!=ds)begin
-         if(dst_ready)
+         if(dst_vi&dst_ready)
            dst_a <= dst_a + 1;
       end else begin
          dst_vi <= 1'b0;
@@ -108,14 +112,25 @@ module sample_ctrl
 
    wire       bwrite_v = bwrite & src_valid & src_ready;
    wire       wwrite_v = wwrite & src_valid & src_ready;
-   wire       init = (wwrite|bwrite) & ~src_valid;
+   wire       init = ~(wwrite|bwrite|run);
 
    always_ff @(posedge clk)begin
-      if(s_init)begin
-         k_init <= 1'b1;
-      end else if(k_init|init)begin
+      if(init)begin
          k_init <= 1'b0;
-         exec <= k_init;
+         exec <= 1'b0;
+         inc <= 0;
+         wy <= 0;
+         wx <= 0;
+         wa <= 0;
+         ia <= 0;
+         iac <= 0;
+         k_fin <= 1'b0;
+         s_fin <= 1'b0;
+      end else if(s_init)begin
+         k_init <= 1'b1;
+      end else if(k_init)begin
+         k_init <= 1'b0;
+         exec <= 1'b1;
          inc <= 0;
          wy <= 0;
          wx <= 0;
@@ -162,7 +177,7 @@ module sample_ctrl
    end
 
    always_ff @(posedge clk)begin
-      if(s_init)begin
+      if(s_init|init)begin
          kx <= 0;
          ka <= 0;
       end else if(k_fin)begin
@@ -178,24 +193,24 @@ module sample_ctrl
 
    always_ff @(posedge clk)begin
       outr <= outrp;
-      if(~outr)begin
+      if(~outr|init)begin
          ra <= 0;
       end else begin
          ra <= ra+1;
       end
-      if(~(outrp&outr))begin
+      if(~(outrp&outr)|init)begin
          oa <= outp;
       end else begin
          oa <= oa+os;
       end
-      if(s_init)begin
+      if(s_init|init)begin
          outp <= 0;
       end else if(~outrp&outr)begin
          outp <= outp+1;
       end
-      if(k_fin)begin
+      if(k_fin|init)begin
          outc <= 0;
-         outrp <= 1'b1;
+         outrp <= k_fin;
       end else if(outc!=od)begin
          outc <= outc+1;
       end else begin
