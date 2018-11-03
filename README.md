@@ -32,7 +32,7 @@ root@Cora-Z7-07S:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs
 今はまだ、順方向伝搬だけしか対応していません。  
 
 ### WSL 上で実行するには
-まずは Verilator とコラボして、協調検証環境(全部手彫り)を構築中です。
+Verilator とコラボした協調検証環境(全部手彫り)です。  
 すごく遅いですが、```examples/mnist``` 以下で次のコマンドを打つと動きます。
 
 [sim_lv1 ブランチ](https://github.com/tom01h/tiny-dnn/tree/sim_lv1) は FPU が偽物で、比較的高速なシミュレーションができます。  
@@ -63,6 +63,7 @@ $ cd peta
 $ petalinux-create --type project --template zynq --name tiny-dnn
 $ cd tiny-dnn/
 $ petalinux-config --get-hw-description=../project_1.sdk
+$ vi project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi
 $ petalinux-build
 $ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga images/linux/system.bit --u-boot
 ```

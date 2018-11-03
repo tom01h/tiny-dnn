@@ -4,7 +4,8 @@
 
 AXI Stream で 1サンプル分のデータを受け取り、core で畳み込み計算をして、AXI Stream で 1サンプル分の結果を吐き出します。  
 source buffer と destination buffer に 1サンプル分の入出力データを置くためのバッファを持ちます。  
-sample controller で 1サンプル内の制御をして、batch controller でミニバッチ 1層の制御をします。
+sample controller で 1サンプル内の制御をして、batch controller でミニバッチ 1層の制御をします。  
+今はまだ、順方向伝搬だけしか対応していません。  
 
 ![](top.png)
 
@@ -31,15 +32,16 @@ CPU からリクエストを受けて
 畳み込みの計算をしますが、この説明は別の機会に…
 
 ## 検証環境
-Verilator とコラボして、協調検証環境(全部手彫り)を構築中です。  
-作りかけですが、次のコマンドを打つと動きます。
+Verilator とコラボした協調検証環境(全部手彫り)です。  
+すごく遅いですが、次のコマンドを打つと動きます。
+
+[sim_lv1 ブランチ](https://github.com/tom01h/tiny-dnn/tree/sim_lv1) は FPU が偽物で、比較的高速なシミュレーションができます。  
+master ブランチは FPU が本物なので、シミュレーションが遅いです。
 
 ```
 $ make
 $ sim/Vtiny_dnn_top --data_path ../../data/ --learning_rate 1 --epochs 1 --minibatch_size 16 --backend_type internal
 ```
-
-まだちゃんとAXI Stream になっていないし、テストベンチからの制御も残っているし、パラメータの書き込みに変なインタフェースが残っています。
 
 ## FPGA で動かすには
 
