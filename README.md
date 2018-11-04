@@ -4,7 +4,7 @@
 
 課題は ```examples/mnist``` を軽量化して実験中です。
 
-## ソフトだけの実装の使い方
+## CPU だけで実行する
 
 [このコミット](https://github.com/tom01h/tiny-dnn/tree/fa7d77bf524b4604d6088ae5a944193f1c2464af)を使う
 
@@ -31,23 +31,7 @@ root@Cora-Z7-07S:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs
 ## アクセラレータ実装中
 今はまだ、順方向伝搬だけしか対応していません。  
 
-説明は ```examples/mnist/readme.md``` を整備中です。
+説明は ```examples/mnist/readme.md``` に整備中です。
 
-#### Petalinux を作るには
-Vivado で Zynq PS と ```CORA/tiny_dnn_top.v, tiny_dnn_core.sv``` をつないでビットストリームを作る。  
-その時 ```tiny_dnn_top``` は ```0x40000000``` から ```0x4000ffff``` にマップする。  
-Vivado でビットストリーム込みの hdf ファイルをエクスポート、```peta/project_1.sdk```にコピーして、
-```
-$ source /opt/pkg/petalinux/settings.sh
-$ cd peta
-$ petalinux-create --type project --template zynq --name tiny-dnn
-$ cd tiny-dnn/
-$ petalinux-config --get-hw-description=../project_1.sdk
-$ vi project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi
-$ petalinux-build
-$ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga images/linux/system.bit --u-boot
-```
-
-#### 実行は
-上記で作成した ```images/linux/BOOT.bin, image.ub``` と、コンパイル済みのソフトと入力データ ```train, data/``` を SD カードにコピーして Zynq をブートする。  
-実行コマンドも、ソフトだけの時と同じです。
+このくらい高速になります。  
+![](speed.png)
