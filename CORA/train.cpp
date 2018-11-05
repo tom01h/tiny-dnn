@@ -72,10 +72,10 @@ static void train_net(const std::string &data_dir_path,
   tiny_dnn::parse_mnist_images(data_dir_path + "/t10k-images.idx3-ubyte",
                                &test_images, -1.0, 1.0, 0, 0);
 
-  train_labels.resize(3008);
-  train_images.resize(3008);
-  //train_labels.resize(20000);
-  //train_images.resize(20000);
+  //train_labels.resize(3008);
+  //train_images.resize(3008);
+  train_labels.resize(20000);
+  train_images.resize(20000);
   //train_labels.resize(32);
   //train_images.resize(32);
 
@@ -143,22 +143,30 @@ int main(int argc, char **argv) {
   int minibatch_size                     = 16;
   tiny_dnn::core::backend_t backend_type = tiny_dnn::core::default_engine();
 
-  int fd;
+  int fd,dma,dnn;
 
   /* メモリアクセス用のデバイスファイルを開く */
-  if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) < 0) {
+  if ((fd = open("/dev/mem", O_RDWR)) < 0) {
+    perror("open");
+    return -1;
+  }
+  if ((dma = open("/dev/uio0", O_RDWR | O_SYNC)) < 0) {
+    perror("open");
+    return -1;
+  }
+  if ((dnn = open("/dev/uio1", O_RDWR | O_SYNC)) < 0) {
     perror("open");
     return -1;
   }
 
   /* ARM(CPU)から見た物理アドレス → 仮想アドレスへのマッピング */
-  dnn_addr = (int)mmap(NULL, 0x10000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, DNN_BASE);
+  dnn_addr = (int)mmap(NULL, 0x10000, PROT_READ | PROT_WRITE, MAP_SHARED, dnn, 0);
   if (dnn_addr == (int)MAP_FAILED) {
     perror("mmap");
     close(fd);
     return -1;
   }
-  dma_addr = (int)mmap(NULL, 0x10000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, DMA_BASE);
+  dma_addr = (int)mmap(NULL, 0x10000, PROT_READ | PROT_WRITE, MAP_SHARED, dma, 0);
   if (dma_addr == (int)MAP_FAILED) {
     perror("mmap");
     close(fd);

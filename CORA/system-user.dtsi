@@ -1,12 +1,25 @@
 /include/ "system-conf.dtsi"
 / {
-	reserved-memory {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
+    chosen {
+        bootargs = "console=ttyPS0,115200 earlyprintk uio_pdrv_genirq.of_id=generic-uio";
+        stdout-path = "serial0:115200n8";
+    };
 
-		dma_reserved: dma@0x1c000000 {
-			reg = <0x1c000000 0x04000000>;
-		};
-	};
+    reserved-memory {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges;
+
+        dma_reserved: dma@0x1c000000 {
+            reg = <0x1c000000 0x04000000>;
+        };
+    };
 };
+
+&axi_bram_ctrl_0 {
+    compatible = "generic-uio";
+};
+&axi_bram_ctrl_1 {
+    compatible = "generic-uio";
+};
+

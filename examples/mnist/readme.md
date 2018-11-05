@@ -69,6 +69,16 @@ FPGA にもっていくときは、同じところを PL を操作するよう�
 |        | AXI DMA              | 4040_0000     | 4040_FFFF   |
 | DMA    | DDR                  | 1C00_0000     | 1FFF_FFFF   |
 
+ACP 周りで Critical Warning 出るけど、良く分からないので放置しています。
+
+```
+[BD 41-1629] </processing_system7_0/S_AXI_ACP/ACP_M_AXI_GP0> is excluded from all addressable master spaces.
+```
+
+また、ACP を使うときには AxCACHE を 1111 or 1110 にする必要があるようなので ```Constant IP``` を使って 1111 を入れています。  
+詳しい話は [ここ](https://qiita.com/ikwzm/items/b2ee2e2ade0806a9ec07) を参照ください。  
+あと、PL の設定で ```Tie off AxUSER``` にチェックを入れています。
+
 ### Petalinux を作る
 
 #### 暫定版
@@ -85,7 +95,9 @@ $ petalinux-create --type project --template zynq --name tiny-dnn
 $ cd tiny-dnn/
 $ petalinux-config --get-hw-description=../project_1.sdk
 ```
+
 DMA 転送用のバッファ (0x1c000000-0x1fffffff) を確保して Linux が使わないようにする。  
+また、DMA と tiny-dnn アクセラレータのレジスタ空間は uio にする。  
 具体的には ```CORA/system-user.dtsi``` で ```project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi``` を上書きして、
 
 ```
@@ -95,7 +107,7 @@ $ petalinux-build
 bit ファイルは tiny_dnn アクセラレータの入った本物をコピーしてきて使う。
 
 ```
-$ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga ../design1_wrapper.bit --u-boot
+$ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga ../design_1_wrapper.bit --u-boot
 ```
 
 生成物は ```images/linux/BOOT.bin, image.ub``` です。
