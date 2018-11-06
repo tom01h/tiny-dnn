@@ -40,63 +40,62 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   size_t kh          = params.weight.height_;
   size_t elem_stride = params.w_stride;
   size_t line_stride = iw * params.h_stride;
-  size_t filter_size = 512;
-
-  verilator_top->ss = iw*ih*id-1;
-  verilator_top->id = id-1;
-  verilator_top->is = iw*ih;
-  verilator_top->ih = ih-1;
-  verilator_top->iw = iw-1;
-  verilator_top->ds = ow*oh*od-1;
-  verilator_top->od = od-1;
-  verilator_top->os = ow*oh;
-  verilator_top->oh = oh-1;
-  verilator_top->ow = ow-1;
-  verilator_top->fs = kw*kh*id-1;
-  verilator_top->kh = kh-1;
-  verilator_top->kw = kw-1;
-
-
-  verilator_top->wwrite = 0;
-  verilator_top->bwrite = 0;
-  verilator_top->run = 0;
-  verilator_top->src_valid = 0;
-  verilator_top->dst_ready = 1;
-  eval();
-  
-  verilator_top->wwrite = 1;
-  eval();
-  verilator_top->src_valid = 1;
-  for(size_t i=0;i<od*id*kh*kw;i++){
-    verilator_top->src_data = (double)W[i];
-    eval();
-  }
-  verilator_top->src_valid = 0;
-  eval();
-  verilator_top->wwrite = 0;
-  eval();
-
-  verilator_top->bwrite = 1;
-  eval();
-  verilator_top->src_valid = 1;
-  for (size_t o = 0; o < od; o++) {
-    if (params.has_bias) {
-      verilator_top->src_data = (double)bias[o];
-    }else{
-      verilator_top->src_data = (double)0;
-    }
-    eval();
-  }
-  verilator_top->src_valid = 0;
-  eval();
-  verilator_top->bwrite = 0;
-  eval();
 
   // NOT supported parametor
   // params.tbl.is_connected
   // params.w_stride
   // params.h_stride
   if(in_data.size()>1){
+    verilator_top->ss = iw*ih*id-1;
+    verilator_top->id = id-1;
+    verilator_top->is = iw*ih;
+    verilator_top->ih = ih-1;
+    verilator_top->iw = iw-1;
+    verilator_top->ds = ow*oh*od-1;
+    verilator_top->od = od-1;
+    verilator_top->os = ow*oh;
+    verilator_top->oh = oh-1;
+    verilator_top->ow = ow-1;
+    verilator_top->fs = kw*kh*id-1;
+    verilator_top->kh = kh-1;
+    verilator_top->kw = kw-1;
+
+
+    verilator_top->wwrite = 0;
+    verilator_top->bwrite = 0;
+    verilator_top->run = 0;
+    verilator_top->src_valid = 0;
+    verilator_top->dst_ready = 1;
+    eval();
+  
+    verilator_top->wwrite = 1;
+    eval();
+    verilator_top->src_valid = 1;
+    for(size_t i=0;i<od*id*kh*kw;i++){
+      verilator_top->src_data = (double)W[i];
+      eval();
+    }
+    verilator_top->src_valid = 0;
+    eval();
+    verilator_top->wwrite = 0;
+    eval();
+
+    verilator_top->bwrite = 1;
+    eval();
+    verilator_top->src_valid = 1;
+    for (size_t o = 0; o < od; o++) {
+      if (params.has_bias) {
+        verilator_top->src_data = (double)bias[o];
+      }else{
+        verilator_top->src_data = (double)0;
+      }
+      eval();
+    }
+    verilator_top->src_valid = 0;
+    eval();
+    verilator_top->bwrite = 0;
+    eval();
+
     verilator_top->run = 1;
     eval();
     verilator_top->src_valid = 1;
@@ -191,42 +190,37 @@ void conv2d_op_internal(const tensor_t &prev_out,
   typedef typename vec_t::value_type float_t;
 
   cst = std::chrono::high_resolution_clock::now();
-  for_i(parallelize, prev_out.size(), [&](size_t sample) {
+
+  size_t iw          = params.in_padded.width_;
+  size_t ih          = params.in_padded.height_;
+  size_t id          = params.in.depth_;
+  size_t ow          = params.out.width_;
+  size_t oh          = params.out.height_;
+  size_t od          = params.out.depth_;
+  size_t kw          = params.weight.width_;
+  size_t kh          = params.weight.height_;
+
+  // NOT supported parametor
+  // params.tbl.is_connected
+  // params.w_stride
+  // params.h_stride
+  for (size_t sample = 0; sample < prev_out.size(); sample++) {
     // propagate delta to previous layer
-    for (size_t inc = 0; inc < params.in.depth_; inc++) {
-      for (size_t outc = 0; outc < params.out.depth_; outc++) {
-        if (!params.tbl.is_connected(outc, inc)) continue;
+    for (size_t inc = 0; inc < id; inc++) {
+      for (size_t y = 0; y < ih; y++) {
+        for (size_t x = 0; x < iw; x++) {
 
-        size_t idx        = 0;
-        idx               = params.in.depth_ * outc + inc;
-        idx               = params.weight.get_index(0, 0, idx);
-        const float_t *pw = &W[idx];
-
-        idx                       = params.out.get_index(0, 0, outc);
-        const float_t *pdelta_src = &curr_delta[sample][idx];
-
-        idx = params.in_padded.get_index(0, 0, inc);
-        // float_t* pdelta_dst = &(*prev_delta)[sample][idx];
-        float_t *pdelta_dst = &prev_delta[sample][idx];
-
-        for (size_t y = 0; y < params.out.height_; y++) {
-          for (size_t x = 0; x < params.out.width_; x++) {
-            const float_t *ppw = pw;
-
-            idx                       = y * params.out.width_ + x;
-            const float_t ppdelta_src = pdelta_src[idx];
-
-            float_t *ppdelta_dst =
-              pdelta_dst + y * params.h_stride * params.in_padded.width_ +
-              x * params.w_stride;
-
-            for (size_t wy = 0; wy < params.weight.height_; wy++) {   // NOLINT
-              for (size_t wx = 0; wx < params.weight.width_; wx++) {  // NOLINT
-                idx = wy * params.in_padded.width_ + wx;
-                ppdelta_dst[idx] += *ppw++ * ppdelta_src;
+          for (size_t outc = 0; outc < od; outc++) {
+            for (size_t wy = 0; wy < kh; wy++) {   // NOLINT
+              for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
+                if(((y-wy)>=0) && ((x-wx)>=0) && ((y-wy)<oh) && ((x-wx)<ow)){
+                  prev_delta[sample][inc*ih*iw + y*iw + x] +=
+                    W[id*outc*kh*kw + inc*kh*kw + wy*kw + wx] * curr_delta[sample][outc*oh*ow + (y-wy)*ow + (x-wx)];
+                }
               }
             }
           }
+
         }
       }
     }
@@ -282,7 +276,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
         db[sample][outc] += std::accumulate(delta, deltaa, float_t{0});
       }
     }
-  });
+  };
   cbt += std::chrono::high_resolution_clock::now() - cst;
   if(++cb==3750) std::cout << "cov back "
                            << std::chrono::duration_cast<std::chrono::milliseconds>(cbt).count() << "ms elapsed"

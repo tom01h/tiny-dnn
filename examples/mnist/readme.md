@@ -6,30 +6,9 @@ AXI Stream で 1サンプル分のデータを受け取り、core で畳み込�
 source buffer と destination buffer に 1サンプル分の入出力データを置くためのバッファを持ちます。  
 sample controller で 1サンプル内の制御をして、batch controller でミニバッチ 1層の制御をします。  
 今はまだ、順方向伝搬だけしか対応していません。  
+現在、逆方向の傾き伝搬部分を作成中です。
 
 ![](top.png)
-
-## もう少し細かく
-
-### sample controller
-batch controller からリクエストを受けて
-1. カーネルごとに入力データのアドレスを生成してデータを取ってきつつ計算する
-2. 1カーネル分の計算が終わると出力データのアドレスを生成してデータを吐き出す
-3. 終わったらストライド分(1限定だけど)だけ移動して、1サンプルの計算が終わるまで繰り返す
-
-1サンプルの計算が終わると batch controller に知らせます。
-
-### batch controller
-CPU からリクエストを受けて
-1. 入力側の AXI Stream の ready を上げて 1サンプル分のデータを受け取る
-2. 入力側の AXI Stream の ready を下げて、sample controller にリクエストを投げる
-3. sample controller から計算終了の通知を受けると 出力側の AXI Stream の valid を上げる
-4. 1サンプル分のデータを出力したら valid をさげて、ミニバッチ分だけ繰り返す
-
-ミニバッチが終わると CPU に制御を戻します。
-
-### core
-畳み込みの計算をしますが、この説明は別の機会に…
 
 ## 検証環境
 Verilator とコラボした協調検証環境(全部手彫り)です。  
@@ -45,7 +24,7 @@ $ sim/Vtiny_dnn_top --data_path ../../data/ --learning_rate 1 --epochs 1 --minib
 
 ## FPGA で動かすには
 
-まだ動きません…
+master ブランチを見てください
 
 ## 使っている NN モデル
 こんな感じ。  
