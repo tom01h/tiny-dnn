@@ -67,7 +67,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     verilator_top->src_valid = 0;
     verilator_top->dst_ready = 1;
     eval();
-  
+
     verilator_top->wwrite = 1;
     eval();
     verilator_top->src_valid = 1;
@@ -209,17 +209,24 @@ void conv2d_op_internal(const tensor_t &prev_out,
     for (size_t inc = 0; inc < id; inc++) {
       for (size_t y = 0; y < ih; y++) {
         for (size_t x = 0; x < iw; x++) {
+          int yy = (y-kh+1);
+          int xx = (x-kw+1);
 
+          float_t sum{0};
           for (size_t outc = 0; outc < od; outc++) {
-            for (size_t wy = 0; wy < kh; wy++) {   // NOLINT
-              for (size_t wx = 0; wx < kw; wx++) {  // NOLINT
-                if(((y-wy)>=0) && ((x-wx)>=0) && ((y-wy)<oh) && ((x-wx)<ow)){
-                  prev_delta[sample][inc*ih*iw + y*iw + x] +=
-                    W[id*outc*kh*kw + inc*kh*kw + wy*kw + wx] * curr_delta[sample][outc*oh*ow + (y-wy)*ow + (x-wx)];
-                }
+            for (int wy = 0; wy < kh; wy++) {   // NOLINT
+              if((yy+wy)<0){wy=-yy;}
+              if((yy+wy)==oh){break;}
+              for (int wx = 0; wx < kw; wx++) {  // NOLINT
+                if((xx+wx)<0){wx=-xx;}
+                if((xx+wx)==ow){break;}
+                sum +=
+                  W[id*outc*kh*kw + inc*kh*kw + (kh-1-wy)*kw + (kw-1-wx)] *
+                  curr_delta[sample][outc*oh*ow + (yy+wy)*ow + (xx+wx)];
               }
             }
           }
+          prev_delta[sample][inc*ih*iw + y*iw + x] = sum;
 
         }
       }
