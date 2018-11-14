@@ -46,6 +46,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   // params.w_stride
   // params.h_stride
   if(in_data.size()>1){
+  //if(0){
     verilator_top->ss = iw*ih*id-1;
     verilator_top->id = id-1;
     verilator_top->is = iw*ih;
@@ -61,6 +62,8 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     verilator_top->kw = kw-1;
 
 
+    verilator_top->backprop = 0;
+    verilator_top->enbias = 1;
     verilator_top->wwrite = 0;
     verilator_top->bwrite = 0;
     verilator_top->run = 0;
@@ -124,6 +127,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
       }
     }
 
+    verilator_top->enbias = 0;
     verilator_top->src_valid = 0;
     verilator_top->run = 0;
   }else{
@@ -200,38 +204,103 @@ void conv2d_op_internal(const tensor_t &prev_out,
   size_t kw          = params.weight.width_;
   size_t kh          = params.weight.height_;
 
+  verilator_top->ss = ow*oh*od-1;
+  verilator_top->id = od-1;
+  verilator_top->is = ow*oh;
+  verilator_top->ih = oh-1;
+  verilator_top->iw = ow-1;
+  verilator_top->ds = iw*ih*id-1;
+  verilator_top->od = id-1;
+  verilator_top->os = iw*ih;
+  verilator_top->oh = ih-1;
+  verilator_top->ow = iw-1;
+  verilator_top->fs = kw*kh*od-1;
+  verilator_top->ks = kw*kh-1;
+  verilator_top->kh = kh-1;
+  verilator_top->kw = kw-1;
+
+
+  verilator_top->backprop = 1;
+  verilator_top->enbias = 0;
+  verilator_top->wwrite = 0;
+  verilator_top->bwrite = 0;
+  verilator_top->run = 0;
+  verilator_top->src_valid = 0;
+  verilator_top->dst_ready = 1;
+  eval();
+
+  verilator_top->wwrite = 1;
+  eval();
+  verilator_top->src_valid = 1;
+  for(size_t i=0;i<od*id*kh*kw;i++){
+    verilator_top->src_data = (double)W[i];
+    eval();
+  }
+  verilator_top->src_valid = 0;
+  eval();
+  verilator_top->wwrite = 0;
+  eval();
+
+  verilator_top->run = 1;
+  eval();
+  verilator_top->src_valid = 1;
+
   // NOT supported parametor
   // params.tbl.is_connected
   // params.w_stride
   // params.h_stride
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
-    // propagate delta to previous layer
-    for (size_t inc = 0; inc < id; inc++) {
-      for (size_t y = 0; y < ih; y++) {
-        for (size_t x = 0; x < iw; x++) {
-          int yy = (y-kh+1);
-          int xx = (x-kw+1);
 
-          float_t sum{0};
-          for (size_t outc = 0; outc < od; outc++) {
-            for (int wy = 0; wy < kh; wy++) {   // NOLINT
-              if((yy+wy)<0){wy=-yy;}
-              if((yy+wy)==oh){break;}
-              for (int wx = 0; wx < kw; wx++) {  // NOLINT
-                if((xx+wx)<0){wx=-xx;}
-                if((xx+wx)==ow){break;}
-                sum +=
-                  W[id*outc*kh*kw + inc*kh*kw + (kh-1-wy)*kw + (kw-1-wx)] *
-                  curr_delta[sample][outc*oh*ow + (yy+wy)*ow + (xx+wx)];
+    size_t ina=0;
+    size_t outa=0;
+    const vec_t &in = curr_delta[sample];
+    vec_t &a        = prev_delta[sample];
+
+    while(!verilator_top->dst_valid) {
+      if(verilator_top->src_ready){
+        verilator_top->src_data = in[ina++];
+      }
+      eval();
+    }
+
+    while(verilator_top->dst_valid){
+      a[outa++] = (float)verilator_top->dst_data;
+      eval();
+    }
+
+    // propagate delta to previous layer
+    if(0){
+      for (size_t inc = 0; inc < id; inc++) {
+        for (size_t y = 0; y < ih; y++) {
+          for (size_t x = 0; x < iw; x++) {
+            int yy = (y-kh+1);
+            int xx = (x-kw+1);
+
+            float_t sum{0};
+            for (size_t outc = 0; outc < od; outc++) {
+              for (int wy = 0; wy < kh; wy++) {   // NOLINT
+                if((yy+wy)<0){wy=-yy;}
+                if((yy+wy)==oh){break;}
+                for (int wx = 0; wx < kw; wx++) {  // NOLINT
+                  if((xx+wx)<0){wx=-xx;}
+                  if((xx+wx)==ow){break;}
+                  sum +=
+                    W[id*outc*kh*kw + inc*kh*kw + (kh-1-wy)*kw + (kw-1-wx)] *
+                    curr_delta[sample][outc*oh*ow + (yy+wy)*ow + (xx+wx)];
+                }
               }
             }
+            prev_delta[sample][inc*ih*iw + y*iw + x] = sum;
           }
-          prev_delta[sample][inc*ih*iw + y*iw + x] = sum;
-
         }
       }
     }
+  }
+  verilator_top->backprop = 0;
+  verilator_top->src_valid = 0;
+  verilator_top->run = 0;
 
+  for (size_t sample = 0; sample < prev_out.size(); sample++) {
     // accumulate dw
     for (size_t inc = 0; inc < params.in.depth_; inc++) {
       for (size_t outc = 0; outc < params.out.depth_; outc++) {

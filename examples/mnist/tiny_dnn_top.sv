@@ -2,6 +2,8 @@ module tiny_dnn_top
   (
    input wire        clk,
 
+   input wire        backprop,
+   input wire        enbias,
    input wire        run,
    input wire        wwrite,
    input wire        bwrite,
@@ -27,6 +29,7 @@ module tiny_dnn_top
    input wire [4:0]  oh,
    input wire [4:0]  ow,
    input wire [7:0]  fs,
+   input wire [4:0]  ks,
    input wire [2:0]  kh,
    input wire [2:0]  kw
    );
@@ -113,6 +116,7 @@ module tiny_dnn_top
       .clk(clk),
       .src_valid(src_valid),
       .src_ready(src_ready),
+      .backprop(backprop),
       .run(run),
       .wwrite(wwrite),
       .bwrite(bwrite),
@@ -135,6 +139,7 @@ module tiny_dnn_top
       .oh(oh[4:0]),
       .ow(ow[4:0]),
       .fs(fs[7:0]),
+      .ks(ks[4:0]),
       .kh(kh[2:0]),
       .kw(kw[2:0])
    );
@@ -149,7 +154,7 @@ module tiny_dnn_top
                 .write((wwrite|bwrite)&(wa[12:9] == i) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
-                .bias(k_fin),
+                .bias(k_fin&enbias),
                 .a(wa[8:0]),
                 .d(d),
                 .wd(src_data),

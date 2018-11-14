@@ -68,6 +68,7 @@ module sample_ctrl
    input wire        clk,
    input wire        src_valid,
    input wire        src_ready,
+   input wire        backprop,
    input wire        run,
    input wire        wwrite,
    input wire        bwrite,
@@ -90,6 +91,7 @@ module sample_ctrl
    input wire [4:0]  oh,
    input wire [4:0]  ow,
    input wire [7:0]  fs,
+   input wire [4:0]  ks,
    input wire [2:0]  kh,
    input wire [2:0]  kw
    );
@@ -101,7 +103,7 @@ module sample_ctrl
    reg [2:0]  wx;
 
 
-   reg [4:0]  kx;
+   reg signed [5:0] kx, ky;
    reg [9:0]  ka;
 
    reg [12:0] iac;
@@ -110,18 +112,29 @@ module sample_ctrl
    reg [9:0]  outp;
    reg        outrp;
 
-   wire       bwrite_v = bwrite & src_valid & src_ready;
-   wire       wwrite_v = wwrite & src_valid & src_ready;
    wire       init = ~(wwrite|bwrite|run);
+   wire       bwrite_v = bwrite & src_valid & src_ready;
+   wire       wwrite_v = wwrite & src_valid & src_ready & ~backprop;
+
+   wire       bwwrite_v = wwrite & src_valid & src_ready & backprop;
+
+   wire [2:0] nwx = backprop&(kx<0) ? -kx : 0 ;
+   wire [2:0] nwy = backprop&(ky<0) ? -ky : 0 ;
 
    always_ff @(posedge clk)begin
       if(init)begin
          k_init <= 1'b0;
          exec <= 1'b0;
          inc <= 0;
-         wy <= 0;
-         wx <= 0;
-         wa <= 0;
+         if(backprop)begin
+            wx <= kw;
+            wy <= kh;
+            wa <= ks;
+         end else begin
+            wy <= 0;
+            wx <= 0;
+            wa <= 0;
+         end
          ia <= 0;
          iac <= 0;
          k_fin <= 1'b0;
@@ -132,9 +145,9 @@ module sample_ctrl
          k_init <= 1'b0;
          exec <= 1'b1;
          inc <= 0;
-         wy <= 0;
-         wx <= 0;
-         wa <= 0;
+         wy <= nwy;
+         wx <= nwx;
+         wa <= nwy * (kw+1) + nwx;/////////////////////
          ia <= ka;
          iac <= ka;
          k_fin <= 1'b0;
@@ -142,25 +155,58 @@ module sample_ctrl
          wa <= (wa+f_size)&~(f_size-1);
       end else if(exec|wwrite_v)begin
          wa <= wa+1;
-         if(wx != kw)begin
+         if((wx != kw) & (~backprop|((kx+wx) != iw)))begin
             wx <= wx +1;
             ia <= ia+1;
-         end else if(wy != kh)begin
-            wx <= 0;
+         end else if((wy != kh) & (~backprop|((ky+wy) != ih)))begin
+            wx <= nwx;
             wy <= wy +1;
-            ia <= ia+iw-kw+1;
+            ia <= ia+iw-kw+nwx+1;
+            if(backprop)begin
+               wa <= (wy+1) * (kw+1) + nwx + inc * (ks+1);/////////////////////
+               if(kx+kw>iw)begin
+                  ia <= ia+nwx+1+kx;
+               end
+            end
          end else if(inc != id)begin
-            wx <= 0;
-            wy <= 0;
+            wy <= nwy;
+            wx <= nwx;
+            if(backprop)begin
+               wa <= nwy * (kw+1) + nwx + (inc+1) * (ks+1);/////////////////////
+            end
             inc <= inc +1;
             iac <= iac+is;
             ia  <= iac+is;
          end else begin
-            wx <= 0;
-            wy <= 0;
+            wy <= nwy;
+            wx <= nwx;
+            if(backprop)begin
+               wa <= nwy * (kw+1) + nwx;
+            end
             inc <= 0;
             exec <= 1'b0;
             k_fin <= exec;
+         end
+      end else if(bwwrite_v)begin
+         wa <= wa-1;
+         if(wx != 0)begin
+            wx <= wx -1;
+         end else if(wy != 0)begin
+            wx <= kw;
+            wy <= wy -1;
+         end else if((wa & ~(f_size-1)) != od*f_size)begin
+            wx <= kw;
+            wy <= kh;
+            wa <= wa+f_size+ks;
+         end else if(inc != id)begin
+            wx <= kw;
+            wy <= kh;
+            inc <= inc +1;
+            wa <= (wa + ks*2 + 1) & (f_size-1);
+         end else begin
+            wx <= kw;
+            wy <= kh;
+            inc <= 0;
          end
       end else begin
          k_fin <= 1'b0;
@@ -176,17 +222,42 @@ module sample_ctrl
       end
    end
 
+
    always_ff @(posedge clk)begin
       if(s_init|init)begin
-         kx <= 0;
+         if(~backprop)begin
+            kx <= 0;
+            ky <= 0;
+         end else begin
+            kx <= -kw;
+            ky <= -kh;
+         end
          ka <= 0;
       end else if(k_fin)begin
-         if(kx != ow)begin
-            kx <= kx+1;
-            ka <= ka+1;
+         if(~backprop)begin
+            if(kx != ow)begin
+               kx <= kx+1;
+               ka <= ka+1;
+            end else begin
+               kx <= 0;
+               ka <= ka+iw-ow+1;
+               ky <= ky+1;
+            end
          end else begin
-            kx <= 0;
-            ka <= ka+iw-ow+1;
+            if(kx != iw)begin
+               kx <= kx+1;
+               if(kx>=0)begin
+                  ka <= ka+1;
+               end
+            end else begin
+               kx <= -kw;
+               if(ky>=0)begin
+                  ka <= ka+1;
+               end else begin
+                  ka <= 0;
+               end
+               ky <= ky+1;
+            end
          end
       end
    end
