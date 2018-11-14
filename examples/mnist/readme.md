@@ -6,7 +6,8 @@
 AXI Stream で 1サンプル分のデータを受け取り、core で畳み込み計算をして、AXI Stream で 1サンプル分の結果を吐き出します。  
 source buffer と destination buffer に 1サンプル分の入出力データを置くためのバッファを持ちます。  
 ウェイト用のバッファは core 内に持ちます。  
-sample controller で 1サンプル内の制御をして、batch controller でミニバッチ 1層の制御をします。  
+sample controller で 1サンプル内の制御をして、batch controller でミニバッチ 1層の制御をします。
+
 順方向伝搬と逆方向の傾き伝搬部分に対応しています。  
 sample control に見直しが必要なところが残っていますが…  
 ウェイトの傾き計算はまだ対応していません。
@@ -119,6 +120,7 @@ $ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga ../d
 
 FPGA で実行するプログラムをコンパイルするときは、```CORA/conv2d_op_internal.h, train.cpp``` で ```tiny_dnn/core/kernels/, examples/mnist/``` を上書きします。    
 その後、ホストPCでクロスコンパイルして
+
 ```
 $ arm-linux-gnueabi-g++ -O3 -mfpu=neon -mtune=cortex-a9 -mcpu=cortex-a9 -mfloat-abi=softfp -Wall -Wpedantic -Wno-narrowing -Wno-deprecated -DNDEBUG -std=gnu++14 -I ../../ -DDNN_USE_IMAGE_API train.cpp -o train -static
 ```

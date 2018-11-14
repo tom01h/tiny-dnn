@@ -57,7 +57,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   // params.h_stride
   if(in_data.size()>1){
 
-    REG(dnn_addr+20) = iw*ih*id-1; //ss 
+    REG(dnn_addr+20) = iw*ih*id-1; //ss
     REG(dnn_addr+24) = id-1;       //id
     REG(dnn_addr+28) = iw*ih;      //is
     REG(dnn_addr+32) = ih-1;       //ih
@@ -70,8 +70,9 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     REG(dnn_addr+56) = ow-1;       //ow
 
     REG(dnn_addr+ 4) = kw*kh*id-1; //fs
-    REG(dnn_addr+ 8) = kh-1;       //kh
-    REG(dnn_addr+12) = kw-1;       //kw
+    REG(dnn_addr+ 8) = kw*kh-1;    //ks
+    REG(dnn_addr+12) = kh-1;       //kh
+    REG(dnn_addr+16) = kw-1;       //kw
 
 
     /////////////////////////////////////////////////////////
@@ -124,8 +125,8 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
     /////////////////////////////////////////////////////////
     // Run
-    REG(dnn_addr+ 0) = 0; // init
-    REG(dnn_addr+ 0) = 4; // run
+    REG(dnn_addr+ 0) = 0;   // init
+    REG(dnn_addr+ 0) = 4|8; // run|enbias
 
     for (size_t sample = 0; sample < in_data.size(); sample++) {
       const vec_t &in = in_data[sample];
@@ -231,46 +232,101 @@ void conv2d_op_internal(const tensor_t &prev_out,
   typedef typename vec_t::value_type float_t;
 
   cst = std::chrono::high_resolution_clock::now();
-  for_i(parallelize, prev_out.size(), [&](size_t sample) {
-    // propagate delta to previous layer
-    for (size_t inc = 0; inc < params.in.depth_; inc++) {
-      for (size_t outc = 0; outc < params.out.depth_; outc++) {
-        if (!params.tbl.is_connected(outc, inc)) continue;
 
-        size_t idx        = 0;
-        idx               = params.in.depth_ * outc + inc;
-        idx               = params.weight.get_index(0, 0, idx);
-        const float_t *pw = &W[idx];
+  size_t iw          = params.in_padded.width_;
+  size_t ih          = params.in_padded.height_;
+  size_t id          = params.in.depth_;
+  size_t ow          = params.out.width_;
+  size_t oh          = params.out.height_;
+  size_t od          = params.out.depth_;
+  size_t kw          = params.weight.width_;
+  size_t kh          = params.weight.height_;
 
-        idx                       = params.out.get_index(0, 0, outc);
-        const float_t *pdelta_src = &curr_delta[sample][idx];
+  REG(dnn_addr+20) = ow*oh*od-1; //ss
+  REG(dnn_addr+24) = od-1;       //id
+  REG(dnn_addr+28) = ow*oh;      //is
+  REG(dnn_addr+32) = oh-1;       //ih
+  REG(dnn_addr+36) = ow-1;       //iw
+    
+  REG(dnn_addr+40) = iw*ih*id-1; //ds
+  REG(dnn_addr+44) = id-1;       //od
+  REG(dnn_addr+48) = iw*ih;      //os
+  REG(dnn_addr+52) = ih-1;       //oh
+  REG(dnn_addr+56) = iw-1;       //ow
 
-        idx = params.in_padded.get_index(0, 0, inc);
-        // float_t* pdelta_dst = &(*prev_delta)[sample][idx];
-        float_t *pdelta_dst = &prev_delta[sample][idx];
+  REG(dnn_addr+ 4) = kw*kh*od-1; //fs
+  REG(dnn_addr+ 8) = kw*kh-1;    //ks
+  REG(dnn_addr+12) = kh-1;       //kh
+  REG(dnn_addr+16) = kw-1;       //kw
 
-        for (size_t y = 0; y < params.out.height_; y++) {
-          for (size_t x = 0; x < params.out.width_; x++) {
-            const float_t *ppw = pw;
+  /////////////////////////////////////////////////////////
+  // Weight transfer
+  // AXI DMA reset
+  REG(dma_addr + 0x00) = 4;
+  while (REG(dma_addr + 0x00) & 0x4); // Wait for reset finish
 
-            idx                       = y * params.out.width_ + x;
-            const float_t ppdelta_src = pdelta_src[idx];
+  // DMA Buffer
+  for(size_t i=0;i<od*id*kh*kw;i++){
+    conv.f = W[i];
+    REG(src_addr+i*4) = conv.i;
+  }
 
-            float_t *ppdelta_dst =
-              pdelta_dst + y * params.h_stride * params.in_padded.width_ +
-              x * params.w_stride;
+  REG(dnn_addr+ 0) = 0|16; // init|backprop
+  REG(dnn_addr+ 0) = 2|16; // wwrite|backprop
 
-            for (size_t wy = 0; wy < params.weight.height_; wy++) {   // NOLINT
-              for (size_t wx = 0; wx < params.weight.width_; wx++) {  // NOLINT
-                idx = wy * params.in_padded.width_ + wx;
-                ppdelta_dst[idx] += *ppw++ * ppdelta_src;
-              }
-            }
-          }
-        }
+  // AXI DMA transfer tx
+  REG(dma_addr+ 0x00) = 1;
+  REG(dma_addr+ 0x18) = 0x1c000000;
+  REG(dma_addr+ 0x28) = od*id*kh*kw*4;
+
+  while ((REG(dma_addr+ 0x04) & 0x3)==0); // Wait for the tx to finish
+
+  /////////////////////////////////////////////////////////
+  // Run
+  REG(dnn_addr+ 0) = 0|16; // init|backprop
+  REG(dnn_addr+ 0) = 4|16; // run|backprop
+
+  for (size_t sample = 0; sample < prev_out.size(); sample++) {
+    const vec_t &in = curr_delta[sample];
+    vec_t &a        = prev_delta[sample];
+
+      // AXI DMA reset
+      REG(dma_addr + 0x30) = 4;
+      REG(dma_addr + 0x0) = 4;
+      while (REG(dma_addr + 0x0) & 0x4); // Wait for reset finish
+
+      /////////////////////////////////////////////////////////
+      // in data
+      for(size_t i=0;i<ow*oh*od;i++){
+        conv.f = in[i];
+        REG(src_addr+i*4) = conv.i;
       }
-    }
 
+      // AXI DMA transfer rx
+      REG(dma_addr+ 0x30) = 1;
+      REG(dma_addr+ 0x48) = 0x1e000000;
+      REG(dma_addr+ 0x58) = iw*ih*id*4;
+
+      // AXI DMA transfer tx
+      REG(dma_addr+ 0x00) = 1;
+      REG(dma_addr+ 0x18) = 0x1c000000;
+      REG(dma_addr+ 0x28) = ow*oh*od*4;
+
+      // Wait for the tx to finish
+      while ((REG(dma_addr+ 0x04) & 0x3)==0);
+
+      // Wait for the rx to finish
+      while ((REG(dma_addr+ 0x34) & 0x3)==0) ;
+
+      for(size_t i=0;i<id*ih*iw;i++){
+        conv.i = REG(dst_addr+i*4);
+        a[i] = conv.f;
+      }
+  }
+
+  REG(dnn_addr+ 0) = 0; // idle
+
+  for (size_t sample = 0; sample < prev_out.size(); sample++) {
     // accumulate dw
     for (size_t inc = 0; inc < params.in.depth_; inc++) {
       for (size_t outc = 0; outc < params.out.depth_; outc++) {
@@ -322,7 +378,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
         db[sample][outc] += std::accumulate(delta, deltaa, float_t{0});
       }
     }
-  });
+  }
   cbt += std::chrono::high_resolution_clock::now() - cst;
   if(++cb==3750) std::cout << "cov back "
                            << std::chrono::duration_cast<std::chrono::milliseconds>(cbt).count() << "ms elapsed"

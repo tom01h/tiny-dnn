@@ -26,6 +26,8 @@ module tiny_dnn_reg
 
    ////////////////////////////////////////////////////////////////////////////
    // Control signal
+   output reg        backprop,
+   output reg        enbias,
    output reg        run,
    output reg        wwrite,
    output reg        bwrite,
@@ -41,6 +43,7 @@ module tiny_dnn_reg
    output reg [4:0]  oh,
    output reg [4:0]  ow,
    output reg [7:0]  fs,
+   output reg [4:0]  ks,
    output reg [2:0]  kh,
    output reg [2:0]  kw
    );
@@ -104,10 +107,11 @@ module tiny_dnn_reg
          S_AXI_RDATA <= 32'h0;
       end else if(read)begin
          case(S_AXI_ARADDR[5:2])
-           4'd0 : S_AXI_RDATA <= {29'h0,run,wwrite,bwrite};
+           4'd0 : S_AXI_RDATA <= {27'h0, backprop, enbias, run, wwrite, bwrite};
            4'd1 : S_AXI_RDATA <= {24'h0,fs[7:0]};
-           4'd2 : S_AXI_RDATA <= {29'h0,kh[2:0]};
-           4'd3 : S_AXI_RDATA <= {29'h0,kw[2:0]};
+           4'd2 : S_AXI_RDATA <= {27'h0,ks[4:0]};
+           4'd3 : S_AXI_RDATA <= {29'h0,kh[2:0]};
+           4'd4 : S_AXI_RDATA <= {29'h0,kw[2:0]};
 
            4'd5 : S_AXI_RDATA <= {20'h0,ss[11:0]};
            4'd6 : S_AXI_RDATA <= {28'h0,id[3:0]};
@@ -128,6 +132,8 @@ module tiny_dnn_reg
 
    always @(posedge S_AXI_ACLK)begin
       if(~S_AXI_ARESETN)begin
+           backprop <= 0;
+           enbias <= 0;
            run <= 0;
            wwrite <= 0;
            bwrite <= 0;
@@ -148,10 +154,11 @@ module tiny_dnn_reg
            ow[4:0] <= 0;
       end else if(write)begin
          case(wb_adr_i[5:2])
-           4'd0 : {run,wwrite,bwrite} <= wb_dat_i[2:0];
+           4'd0 : {backprop, enbias, run, wwrite, bwrite} <= wb_dat_i[4:0];
            4'd1 : fs[7:0] <= wb_dat_i[7:0];
-           4'd2 : kh[2:0] <= wb_dat_i[2:0];
-           4'd3 : kw[2:0] <= wb_dat_i[2:0];
+           4'd2 : ks[4:0] <= wb_dat_i[4:0];
+           4'd3 : kh[2:0] <= wb_dat_i[2:0];
+           4'd4 : kw[2:0] <= wb_dat_i[2:0];
 
            4'd5 : ss[11:0] <= wb_dat_i[11:0];
            4'd6 : id[3:0] <= wb_dat_i[3:0];

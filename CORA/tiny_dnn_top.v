@@ -65,6 +65,8 @@ module tiny_dnn_top
    wire               dst_ready = M_AXIS_TREADY;
 
 
+   wire               backprop;
+   wire               enbias;
    wire               run;
    wire               wwrite;
    wire               bwrite;
@@ -80,6 +82,7 @@ module tiny_dnn_top
    wire [4:0]         oh;
    wire [4:0]         ow;
    wire [7:0]         fs;
+   wire [4:0]         ks;
    wire [2:0]         kh;
    wire [2:0]         kw;
 
@@ -108,10 +111,11 @@ module tiny_dnn_top
       .S_AXI_RVALID(S_AXI_RVALID),
       .S_AXI_RREADY(S_AXI_RREADY),
 
+      .backprop(backprop), .enbias(enbias), 
       .run(run), .wwrite(wwrite), .bwrite(bwrite),
       .ss(ss), .id(id), .is(is), .ih(ih), .iw(iw),
       .ds(ds), .od(od), .os(os), .oh(oh), .ow(ow),
-      .fs(fs), .kh(kh), .kw(kw)
+      .fs(fs),          .ks(ks), .kh(kh), .kw(kw)
       );
 
    //  batch control <-> sample control
@@ -188,6 +192,7 @@ module tiny_dnn_top
       .clk(clk),
       .src_valid(src_valid),
       .src_ready(src_ready),
+      .backprop(backprop),
       .run(run),
       .wwrite(wwrite),
       .bwrite(bwrite),
@@ -210,6 +215,7 @@ module tiny_dnn_top
       .oh(oh[4:0]),
       .ow(ow[4:0]),
       .fs(fs[7:0]),
+      .ks(ks[4:0]),
       .kh(kh[2:0]),
       .kw(kw[2:0])
       );
@@ -241,7 +247,7 @@ module tiny_dnn_top
                 .write((wwrite|bwrite)&(wa[12:9] == i) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
-                .bias(k_fin),
+                .bias(k_fin&enbias),
                 .a(wa[8:0]),
                 .d(d),
                 .wd(src_data[31:16]),
