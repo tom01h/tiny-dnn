@@ -80,7 +80,8 @@ module sample_ctrl
    output reg [12:0] ia,
    output reg        outr,
    output reg [12:0] oa,
-   output reg [12:0] wa,
+   output reg [3:0]  kn,
+   output reg [9:0]  wa,
    output reg [3:0]  ra,
    input wire [3:0]  id,
    input wire [9:0]  is,
@@ -95,8 +96,6 @@ module sample_ctrl
    input wire [2:0]  kh,
    input wire [2:0]  kw
    );
-
-   parameter f_size = 512;
 
    reg [3:0]  inc;
    reg [2:0]  wy;
@@ -126,6 +125,7 @@ module sample_ctrl
          k_init <= 1'b0;
          exec <= 1'b0;
          inc <= 0;
+         kn <= 0;
          if(backprop)begin
             wx <= kw;
             wy <= kh;
@@ -151,8 +151,9 @@ module sample_ctrl
          ia <= ka;
          iac <= ka;
          k_fin <= 1'b0;
-      end else if(bwrite_v | wwrite_v&((wa&(f_size-1))==fs))begin
-         wa <= (wa+f_size)&~(f_size-1);
+      end else if(bwrite_v | wwrite_v&(wa==fs))begin
+         kn <= kn + 1;
+         wa <= 0;
       end else if(exec|wwrite_v)begin
          wa <= wa+1;
          if((wx != kw) & (~backprop|((kx+wx) != iw)))begin
@@ -194,15 +195,17 @@ module sample_ctrl
          end else if(wy != 0)begin
             wx <= kw;
             wy <= wy -1;
-         end else if((wa & ~(f_size-1)) != od*f_size)begin
+         end else if(kn != od)begin
             wx <= kw;
             wy <= kh;
-            wa <= wa+f_size+ks;
+            kn <= kn + 1;
+            wa <= wa+ks;
          end else if(inc != id)begin
             wx <= kw;
             wy <= kh;
             inc <= inc +1;
-            wa <= (wa + ks*2 + 1) & (f_size-1);
+            kn <= 0;
+            wa <= wa + ks*2 + 1;
          end else begin
             wx <= kw;
             wy <= kh;

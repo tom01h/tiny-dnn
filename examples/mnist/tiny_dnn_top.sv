@@ -43,7 +43,8 @@ module tiny_dnn_top
    // sample control -> core
    wire               k_init;
    wire               k_fin;
-   wire [12:0]        wa;
+   wire [3:0]         kn;
+   wire [9:0]         wa;
    wire [3:0]         ra;
 
    // sample control -> core, src buffer
@@ -128,7 +129,8 @@ module tiny_dnn_top
       .ia(ia[11:0]),
       .outr(outr),
       .oa(oa[11:0]),
-      .wa(wa[12:0]),
+      .kn(kn[3:0]),
+      .wa(wa[9:0]),
       .ra(ra[3:0]),
       .id(id[3:0]),
       .is(is[9:0]),
@@ -151,11 +153,11 @@ module tiny_dnn_top
                (
                 .clk(clk),
                 .init(k_init),
-                .write((wwrite|bwrite)&(wa[12:9] == i) & src_valid & src_ready),
+                .write((wwrite|bwrite)&(kn[3:0] == i) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
                 .bias(k_fin&enbias),
-                .a(wa[8:0]),
+                .a(wa[9:0]),
                 .d(d),
                 .wd(src_data),
                 .sum(sum[i])

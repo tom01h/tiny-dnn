@@ -6,19 +6,19 @@ module tiny_dnn_core
    input wire       bwrite,
    input wire       exec,
    input wire       bias,
-   input wire [8:0] a,
+   input wire [9:0] a,
    input real       d,
    input real       wd,
    output real      sum
    );
 
-   parameter f_size = 512;
+   parameter f_size = 1024;
 
    real          W [0:f_size-1];
    real          w;
    reg           exec1,bias1;
 
-   wire [8:0]    adr = (bwrite|bias) ? f_size-1 : a ;
+   wire [9:0]    adr = (bwrite|bias) ? f_size-1 : a ;
 
    always_ff @(posedge clk)begin
       if(write)begin
