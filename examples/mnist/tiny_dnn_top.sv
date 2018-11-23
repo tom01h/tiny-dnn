@@ -28,10 +28,10 @@ module tiny_dnn_top
    input wire [9:0]  os,
    input wire [4:0]  oh,
    input wire [4:0]  ow,
-   input wire [7:0]  fs,
-   input wire [4:0]  ks,
-   input wire [2:0]  kh,
-   input wire [2:0]  kw
+   input wire [9:0]  fs,
+   input wire [9:0]  ks,
+   input wire [4:0]  kh,
+   input wire [4:0]  kw
    );
 
    parameter f_num  = 16;
@@ -140,10 +140,10 @@ module tiny_dnn_top
       .os(os[9:0]),
       .oh(oh[4:0]),
       .ow(ow[4:0]),
-      .fs(fs[7:0]),
-      .ks(ks[4:0]),
-      .kh(kh[2:0]),
-      .kw(kw[2:0])
+      .fs(fs[9:0]),
+      .ks(ks[9:0]),
+      .kh(kh[4:0]),
+      .kw(kw[4:0])
    );
 
    generate

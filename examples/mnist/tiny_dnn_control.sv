@@ -91,15 +91,15 @@ module sample_ctrl
    input wire [9:0]  os,
    input wire [4:0]  oh,
    input wire [4:0]  ow,
-   input wire [7:0]  fs,
-   input wire [4:0]  ks,
-   input wire [2:0]  kh,
-   input wire [2:0]  kw
+   input wire [9:0]  fs,
+   input wire [9:0]  ks,
+   input wire [4:0]  kh,
+   input wire [4:0]  kw
    );
 
    reg [3:0]  inc;
-   reg [2:0]  wy;
-   reg [2:0]  wx;
+   reg [4:0]  wy;
+   reg [4:0]  wx;
 
 
    reg signed [5:0] kx, ky;
@@ -241,10 +241,14 @@ module sample_ctrl
             if(kx != ow)begin
                kx <= kx+1;
                ka <= ka+1;
-            end else begin
+            end else if(ky != oh)begin
                kx <= 0;
                ka <= ka+iw-ow+1;
                ky <= ky+1;
+            end else begin
+               kx <= 0;
+               ka <= ka-((iw+1)*oh+ow)+is;////////////////////////////////
+               ky <= 0;
             end
          end else begin
             if(kx != iw)begin

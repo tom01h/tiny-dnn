@@ -300,44 +300,96 @@ void conv2d_op_internal(const tensor_t &prev_out,
   verilator_top->src_valid = 0;
   verilator_top->run = 0;
 
+
+  verilator_top->ss = iw*ih*id-1;
+  verilator_top->id = 0;
+  verilator_top->is = iw*ih;
+  verilator_top->ih = ih-1;
+  verilator_top->iw = iw-1;
+
+  verilator_top->ds = kw*kh*id*od-1;
+  verilator_top->od = od-1;
+  verilator_top->os = kw*kh*id;
+  verilator_top->oh = kh-1;
+  verilator_top->ow = kw-1;
+
+  verilator_top->fs = ow*oh-1;
+  verilator_top->ks = ow*oh-1;
+  verilator_top->kh = oh-1;
+  verilator_top->kw = ow-1;
+
+
+  verilator_top->backprop = 0;
+  verilator_top->enbias = 0;
+  verilator_top->wwrite = 0;
+  verilator_top->bwrite = 0;
+  verilator_top->run = 0;
+  verilator_top->src_valid = 0;
+  verilator_top->dst_ready = 1;
+  eval();
+
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
     // accumulate dw
-    for (size_t inc = 0; inc < params.in.depth_; inc++) {
-      for (size_t outc = 0; outc < params.out.depth_; outc++) {
-        if (!params.tbl.is_connected(outc, inc)) continue;
 
-        for (size_t wy = 0; wy < params.weight.height_; wy++) {
-          for (size_t wx = 0; wx < params.weight.width_; wx++) {
-            float_t dst{0};
+    size_t ina=0;
+    size_t outa=0;
 
-            size_t idx           = 0;
-            idx                  = params.in_padded.get_index(wx, wy, inc);
-            const float_t *prevo = &prev_out[sample][idx];
+    const vec_t &delta = curr_delta[sample];
+    const vec_t &prevo = prev_out[sample];
 
-            idx                  = params.out.get_index(0, 0, outc);
-            const float_t *delta = &curr_delta[sample][idx];
+    verilator_top->wwrite = 1;
+    eval();
+    verilator_top->src_valid = 1;
+    for(size_t i=0;i<ow*oh*od;i++){
+      verilator_top->src_data = (double)delta[i];
+      eval();
+    }
+    verilator_top->src_valid = 0;
+    eval();
+    verilator_top->wwrite = 0;
+    eval();
 
-            if (params.w_stride > 1) {
-              for (size_t y = 0; y < params.out.height_; y++) {
-                size_t prevo_idx =
-                  y * params.in_padded.width_ * params.h_stride;
-                size_t delta_idx = y * params.out.width_;
+    verilator_top->run = 1;
+    eval();
+    verilator_top->src_valid = 1;
 
-                for (size_t x = 0; x < params.out.width_; x++) {
-                  dst += prevo[prevo_idx + x * params.w_stride] *
-                         delta[delta_idx + x];
+    while(!verilator_top->dst_valid) {
+      if(verilator_top->src_ready){
+        verilator_top->src_data = prevo[ina++];
+      }
+      eval();
+    }
+
+    while(verilator_top->dst_valid){
+      dW[sample][outa++] = (float)verilator_top->dst_data;
+      eval();
+    }
+
+    verilator_top->src_valid = 0;
+    eval();
+    verilator_top->run = 0;
+    eval();
+
+    if(0){
+      for (size_t outc = 0; outc < od; outc++) {
+        for (size_t inc = 0; inc < id; inc++) {
+
+          const float_t *delta = &curr_delta[sample][outc*ow*oh];
+
+          for (size_t wy = 0; wy < kh; wy++) {
+            for (size_t wx = 0; wx < kw; wx++) {
+              float_t dst{0};
+
+              const float_t *prevo = &prev_out[sample][wx + wy*iw + inc*iw*ih];
+
+              for (size_t y = 0; y < oh; y++) {
+                for (size_t x = 0; x < ow; x++) {
+                  dst += prevo[y*iw + x] * delta[y*ow + x];
                 }
               }
-            } else {
-              for (size_t y = 0; y < params.out.height_; y++) {
-                dst += vectorize::dot(
-                  prevo + y * params.in_padded.width_ * params.h_stride,
-                  delta + y * params.out.width_, params.out.width_);
-              }
-            }
 
-            idx = params.in.depth_ * outc + inc;
-            dW[sample][params.weight.get_index(wx, wy, idx)] += dst;
+              dW[sample][wx + wy*kw + inc*kw*kh + outc*kw*kh*id] = dst;
+            }
           }
         }
       }
@@ -345,11 +397,17 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     // accumulate db
     if (params.has_bias) {
-      for (size_t outc = 0; outc < params.out.depth_; outc++) {
-        size_t idx            = params.out.get_index(0, 0, outc);
-        const float_t *delta  = &curr_delta[sample][idx];
-        const float_t *deltaa = delta + params.out.width_ * params.out.height_;
-        db[sample][outc] += std::accumulate(delta, deltaa, float_t{0});
+      for (size_t outc = 0; outc < od; outc++) {
+        const float_t *delta = &curr_delta[sample][outc*ow*oh];
+        float_t dst{0};
+
+        for (size_t y = 0; y < oh; y++) {
+          for (size_t x = 0; x < ow; x++) {
+            dst += delta[y*ow + x];
+          }
+        }
+
+        db[sample][outc] += dst;
       }
     }
   };
