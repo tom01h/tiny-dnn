@@ -247,7 +247,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
   REG(dnn_addr+28) = ow*oh;      //is
   REG(dnn_addr+32) = oh-1;       //ih
   REG(dnn_addr+36) = ow-1;       //iw
-    
+
   REG(dnn_addr+40) = iw*ih*id-1; //ds
   REG(dnn_addr+44) = id-1;       //od
   REG(dnn_addr+48) = iw*ih;      //os
@@ -290,84 +290,123 @@ void conv2d_op_internal(const tensor_t &prev_out,
     const vec_t &in = curr_delta[sample];
     vec_t &a        = prev_delta[sample];
 
-      // AXI DMA reset
-      REG(dma_addr + 0x30) = 4;
-      REG(dma_addr + 0x0) = 4;
-      while (REG(dma_addr + 0x0) & 0x4); // Wait for reset finish
+    // AXI DMA reset
+    REG(dma_addr + 0x30) = 4;
+    REG(dma_addr + 0x0) = 4;
+    while (REG(dma_addr + 0x0) & 0x4); // Wait for reset finish
 
-      /////////////////////////////////////////////////////////
-      // in data
-      for(size_t i=0;i<ow*oh*od;i++){
-        conv.f = in[i];
-        REG(src_addr+i*4) = conv.i;
-      }
+    /////////////////////////////////////////////////////////
+    // in data
+    for(size_t i=0;i<ow*oh*od;i++){
+      conv.f = in[i];
+      REG(src_addr+i*4) = conv.i;
+    }
 
-      // AXI DMA transfer rx
-      REG(dma_addr+ 0x30) = 1;
-      REG(dma_addr+ 0x48) = 0x1e000000;
-      REG(dma_addr+ 0x58) = iw*ih*id*4;
+    // AXI DMA transfer rx
+    REG(dma_addr+ 0x30) = 1;
+    REG(dma_addr+ 0x48) = 0x1e000000;
+    REG(dma_addr+ 0x58) = iw*ih*id*4;
 
-      // AXI DMA transfer tx
-      REG(dma_addr+ 0x00) = 1;
-      REG(dma_addr+ 0x18) = 0x1c000000;
-      REG(dma_addr+ 0x28) = ow*oh*od*4;
+    // AXI DMA transfer tx
+    REG(dma_addr+ 0x00) = 1;
+    REG(dma_addr+ 0x18) = 0x1c000000;
+    REG(dma_addr+ 0x28) = ow*oh*od*4;
 
-      // Wait for the tx to finish
-      while ((REG(dma_addr+ 0x04) & 0x3)==0);
+    // Wait for the tx to finish
+    while ((REG(dma_addr+ 0x04) & 0x3)==0);
 
-      // Wait for the rx to finish
-      while ((REG(dma_addr+ 0x34) & 0x3)==0) ;
+    // Wait for the rx to finish
+    while ((REG(dma_addr+ 0x34) & 0x3)==0) ;
 
-      for(size_t i=0;i<id*ih*iw;i++){
-        conv.i = REG(dst_addr+i*4);
-        a[i] = conv.f;
-      }
+    for(size_t i=0;i<id*ih*iw;i++){
+      conv.i = REG(dst_addr+i*4);
+      a[i] = conv.f;
+    }
   }
 
   REG(dnn_addr+ 0) = 0; // idle
 
+
+  REG(dnn_addr+20) = iw*ih*id-1; //ss
+  REG(dnn_addr+24) = 0;          //id
+  REG(dnn_addr+28) = iw*ih;      //is
+  REG(dnn_addr+32) = ih-1;       //ih
+  REG(dnn_addr+36) = iw-1;       //iw
+
+  REG(dnn_addr+40) = kw*kh*id*od-1;//ds
+  REG(dnn_addr+44) = od-1;       //od
+  REG(dnn_addr+48) = kw*kh*id;   //os
+  REG(dnn_addr+52) = kh-1;       //oh
+  REG(dnn_addr+56) = kw-1;       //ow
+
+  REG(dnn_addr+ 4) = ow*oh-1;    //fs
+  REG(dnn_addr+ 8) = ow*oh-1;    //ks
+  REG(dnn_addr+12) = oh-1;       //kh
+  REG(dnn_addr+16) = ow-1;       //kw
+
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
     // accumulate dw
-    for (size_t inc = 0; inc < params.in.depth_; inc++) {
-      for (size_t outc = 0; outc < params.out.depth_; outc++) {
-        if (!params.tbl.is_connected(outc, inc)) continue;
+    const vec_t &delta = curr_delta[sample];
+    const vec_t &prevo = prev_out[sample];
+    /////////////////////////////////////////////////////////
+    // current delta transfer
+    // AXI DMA reset
+    REG(dma_addr + 0x00) = 4;
+    while (REG(dma_addr + 0x00) & 0x4); // Wait for reset finish
 
-        for (size_t wy = 0; wy < params.weight.height_; wy++) {
-          for (size_t wx = 0; wx < params.weight.width_; wx++) {
-            float_t dst{0};
-
-            size_t idx           = 0;
-            idx                  = params.in_padded.get_index(wx, wy, inc);
-            const float_t *prevo = &prev_out[sample][idx];
-
-            idx                  = params.out.get_index(0, 0, outc);
-            const float_t *delta = &curr_delta[sample][idx];
-
-            if (params.w_stride > 1) {
-              for (size_t y = 0; y < params.out.height_; y++) {
-                size_t prevo_idx =
-                  y * params.in_padded.width_ * params.h_stride;
-                size_t delta_idx = y * params.out.width_;
-
-                for (size_t x = 0; x < params.out.width_; x++) {
-                  dst += prevo[prevo_idx + x * params.w_stride] *
-                         delta[delta_idx + x];
-                }
-              }
-            } else {
-              for (size_t y = 0; y < params.out.height_; y++) {
-                dst += vectorize::dot(
-                  prevo + y * params.in_padded.width_ * params.h_stride,
-                  delta + y * params.out.width_, params.out.width_);
-              }
-            }
-
-            idx = params.in.depth_ * outc + inc;
-            dW[sample][params.weight.get_index(wx, wy, idx)] += dst;
-          }
-        }
-      }
+    // DMA Buffer
+    for(size_t i=0;i<ow*oh*od;i++){
+      conv.f = delta[i];
+      REG(src_addr+i*4) = conv.i;
     }
+
+    REG(dnn_addr+ 0) = 0; // init
+    REG(dnn_addr+ 0) = 2; // wwrite
+
+    // AXI DMA transfer tx
+    REG(dma_addr+ 0x00) = 1;
+    REG(dma_addr+ 0x18) = 0x1c000000;
+    REG(dma_addr+ 0x28) = ow*oh*od*4;
+
+    while ((REG(dma_addr+ 0x04) & 0x3)==0); // Wait for the tx to finish
+
+    REG(dnn_addr+ 0) = 0; // init
+    REG(dnn_addr+ 0) = 4; // run
+
+    // AXI DMA reset
+    REG(dma_addr + 0x30) = 4;
+    REG(dma_addr + 0x0) = 4;
+    while (REG(dma_addr + 0x0) & 0x4); // Wait for reset finish
+
+    /////////////////////////////////////////////////////////
+    // in data
+    for(size_t i=0;i<iw*ih*id;i++){
+      conv.f = prevo[i];
+      REG(src_addr+i*4) = conv.i;
+    }
+
+    // AXI DMA transfer rx
+    REG(dma_addr+ 0x30) = 1;
+    REG(dma_addr+ 0x48) = 0x1e000000;
+    REG(dma_addr+ 0x58) = kw*kh*id*od*4;
+
+    // AXI DMA transfer tx
+    REG(dma_addr+ 0x00) = 1;
+    REG(dma_addr+ 0x18) = 0x1c000000;
+    REG(dma_addr+ 0x28) = iw*ih*id*4;
+
+    // Wait for the tx to finish
+    while ((REG(dma_addr+ 0x04) & 0x3)==0);
+
+    // Wait for the rx to finish
+    while ((REG(dma_addr+ 0x34) & 0x3)==0) ;
+
+    for(size_t i=0;i<kw*kh*id*od;i++){
+      conv.i = REG(dst_addr+i*4);
+      dW[sample][i] = conv.f;
+    }
+
+    REG(dnn_addr+ 0) = 0; // idle
 
     // accumulate db
     if (params.has_bias) {

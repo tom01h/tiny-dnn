@@ -8,11 +8,9 @@ source buffer と destination buffer に 1サンプル分の入出力データ�
 ウェイト用のバッファは core 内に持ちます。  
 sample controller で 1サンプル内の制御をして、batch controller でミニバッチ 1層の制御をします。
 
-順方向伝搬と逆方向の傾き伝搬部分に対応しています。  
 sample control に見直しが必要なところが残っていますが…  
-ウェイトの傾き計算は対応中です。
 
-![](top.png)
+![](top.svg)
 
 ## もう少し細かく
 
@@ -142,6 +140,7 @@ root@tiny-dnn:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs 1 
 
 PC で学習させると12秒くらいで終わります。  
 学習データも20000に削っています。
+
 ```
 nn << conv(28, 28, 5, 1, 6, padding::valid, true, 1, 1, backend_type)
    << max_pool(24, 24, 6, 2)

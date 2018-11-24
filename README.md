@@ -30,10 +30,19 @@ root@Cora-Z7-07S:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs
 
 ## アクセラレータ実装中
 畳み込みの行列乗算を 16MAC で並列に計算して学習を加速します。  
-順方向伝搬と逆方向の傾き伝搬部分に対応しています。  
-ウェイトの傾き計算は対応中です。  
-
 説明は ```examples/mnist/readme.md``` に整備中です。
 
 このくらい高速になります。  
-![](speed.png)
+ぎりぎり1分切って、ほぼ 4倍高速になりました。
+
+![](speed.svg)
+
+### 残件
+
+- ちゃんと DMA に対応した Petalinux を作る
+- AXI-Stream マスタは最後の転送で LAST を出す
+- 転送と演算と並列実行する
+  - ユーザ空間 ⇔ DMA バッファ間の転送
+  - DMA バッファ ⇔ IP 内バッファの転送
+  - 演算コア → IP 内バッファの転送
+- ZynqMP で IOMMU(SMMU) を使ってみる (持ってないけど…)

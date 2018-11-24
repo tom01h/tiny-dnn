@@ -168,7 +168,7 @@ module tiny_dnn_top
                 .bwrite(bwrite),
                 .exec(exec),
                 .bias(k_fin&enbias),
-                .a(wa[8:0]),
+                .a(wa[9:0]),
                 .d(d),
                 .wd(src_data[31:16]),
                 .signo(signo[i]),
