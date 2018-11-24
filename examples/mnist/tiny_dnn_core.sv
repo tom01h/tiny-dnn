@@ -95,7 +95,7 @@ module tiny_dnn_core
    input wire                bwrite,
    input wire                exec,
    input wire                bias,
-   input wire [8:0]          a,
+   input wire [9:0]          a,
    input wire [15:0]         d, // bfloat16
    input wire [15:0]         wd, // bfloat16
    output wire               signo,
@@ -103,7 +103,7 @@ module tiny_dnn_core
    output wire signed [31:0] addo
    );
 
-   parameter f_size = 512;
+   parameter f_size = 1024;
 
    reg [15:0]         W [0:f_size-1];
 
@@ -116,7 +116,7 @@ module tiny_dnn_core
       biasl <= bias;
    end
 
-   wire [8:0]    adr = (bwrite|bias) ? f_size-1 : a ;
+   wire [9:0]    adr = (bwrite|bias) ? f_size-1 : a ;
 
    always_ff @(posedge clk)
      if(exec|bias)

@@ -28,10 +28,10 @@ module tiny_dnn_top
    input wire [9:0]   os,
    input wire [4:0]   oh,
    input wire [4:0]   ow,
-   input wire [7:0]   fs,
-   input wire [4:0]   ks,
-   input wire [2:0]   kh,
-   input wire [2:0]   kw
+   input wire [9:0]   fs,
+   input wire [9:0]   ks,
+   input wire [4:0]   kh,
+   input wire [4:0]   kw
    );
 
    parameter f_num  = 16;
@@ -43,7 +43,8 @@ module tiny_dnn_top
    // sample control -> core
    wire               k_init;
    wire               k_fin;
-   wire [12:0]        wa;
+   wire [3:0]         kn;
+   wire [9:0]         wa;
    wire [3:0]         ra;
 
    // sample control -> core, src buffer
@@ -122,7 +123,8 @@ module tiny_dnn_top
       .ia(ia[11:0]),
       .outr(outr),
       .oa(oa[11:0]),
-      .wa(wa[12:0]),
+      .kn(kn[3:0]),
+      .wa(wa[9:0]),
       .ra(ra[3:0]),
       .id(id[3:0]),
       .is(is[9:0]),
@@ -132,10 +134,10 @@ module tiny_dnn_top
       .os(os[9:0]),
       .oh(oh[4:0]),
       .ow(ow[4:0]),
-      .fs(fs[7:0]),
-      .ks(ks[4:0]),
-      .kh(kh[2:0]),
-      .kw(kw[2:0])
+      .fs(fs[9:0]),
+      .ks(ks[9:0]),
+      .kh(kh[4:0]),
+      .kw(kw[4:0])
       );
 
    wire               signo [0:15];
@@ -162,7 +164,7 @@ module tiny_dnn_top
                (
                 .clk(clk),
                 .init(k_init),
-                .write((wwrite|bwrite)&(wa[12:9] == i) & src_valid & src_ready),
+                .write((wwrite|bwrite)&(kn[3:0] == i) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
                 .bias(k_fin&enbias),
