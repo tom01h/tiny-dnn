@@ -36,7 +36,7 @@ CPU からリクエストを受けて
 tini_dnn アクセラレータの設定はミニバッチごとに 1回ですが、DMA の設定は 1sample ごとに設定しなおします。
 
 ### core
-畳み込みの計算をしますが、この説明は別の機会に…
+```core.md``` を見てください。
 
 ## 検証環境
 Verilator とコラボした協調検証環境(全部手彫り)です。  
@@ -78,7 +78,7 @@ ACP 周りで Critical Warning 出るけど、良く分からないので放置�
 ```
 
 また、ACP を使うときには AxCACHE を 1111 or 1110 にする必要があるようなので ```Constant IP``` を使って 1111 を入れています。  
-詳しい話は [ここ](https://qiita.com/ikwzm/items/b2ee2e2ade0806a9ec07) を参照ください。  
+詳しい話は [ここ](https://qiita.com/ikwzm/items/b2ee2e2ade0806a9ec07) が参考になります。  
 あと、PL の設定で ```Tie off AxUSER``` にチェックを入れています。
 
 ### Petalinux を作る
@@ -98,6 +98,14 @@ $ cd tiny-dnn/
 $ petalinux-config --get-hw-description=../project_1.sdk
 ```
 
+menuconfig の画面で ```Image Packaging Configuration ->  Root filesystem type -> SD card``` を選択する。
+
+```
+$ petalinux-config -c rootfs
+```
+
+menuconfig の画面で ```Filesystem Packages -> misc -> gcc-runtime -> libstdc++``` を選択する。
+
 DMA 転送用のバッファ (0x1c000000-0x1fffffff) を確保して Linux が使わないようにする。  
 また、DMA と tiny-dnn アクセラレータのレジスタ空間は uio にする。  
 具体的には ```CORA/system-user.dtsi``` で ```project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi``` を上書きして、
@@ -112,7 +120,16 @@ bit ファイルは tiny_dnn アクセラレータの入った本物をコピー
 $ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga ../design_1_wrapper.bit --u-boot
 ```
 
-生成物は ```images/linux/BOOT.bin, image.ub``` です。
+生成物は ```images/linux/BOOT.bin, image.ub, rootfs.ext4``` です。
+
+rootfs.ext4 を書き込む。
+
+```
+$ sudo dd if=images/linux/rootfs.ext4 of=/dev/sdb2 bs=1M conv=noerror
+$ sync
+$ sudo resize2fs /dev/sdb2
+$ sync
+```
 
 ### プログラムをコンパイルする
 
@@ -120,7 +137,7 @@ FPGA で実行するプログラムをコンパイルするときは、```CORA/c
 その後、ホストPCでクロスコンパイルして
 
 ```
-$ arm-linux-gnueabi-g++ -O3 -mfpu=neon -mtune=cortex-a9 -mcpu=cortex-a9 -mfloat-abi=softfp -Wall -Wpedantic -Wno-narrowing -Wno-deprecated -DNDEBUG -std=gnu++14 -I ../../ -DDNN_USE_IMAGE_API train.cpp -o train -static
+$ ${SDK path}/gnu/aarch32/nt/gcc-arm-linux-gnueabi/bin/arm-linux-gnueabihf-g++.exe -O3 -mfpu=neon -mtune=cortex-a9 -mcpu=cortex-a9 -mfloat-abi=hard -Wall -Wpedantic -Wno-narrowing -Wno-deprecated -DNDEBUG -std=gnu++14 -I ../../ -DDNN_USE_IMAGE_API train.cpp -o train
 ```
 
 ### 実行する
