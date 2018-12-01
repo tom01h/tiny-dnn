@@ -19,7 +19,7 @@ $ ./train --data_path ../../data/ --learning_rate 1 --epochs 1 --minibatch_size 
 ### Zynq 上で実行するには
 ホストPCの ```examples/mnist``` 以下でクロスコンパイルして
 ```
-$ arm-linux-gnueabi-g++ -O3 -mfpu=neon -mtune=cortex-a9 -mcpu=cortex-a9 -mfloat-abi=softfp -Wall -Wpedantic -Wno-narrowing -Wno-deprecated -DNDEBUG -std=gnu++14 -I ../../ -DDNN_USE_IMAGE_API train.cpp -o train -static
+$ ${SDK path}/gnu/aarch32/nt/gcc-arm-linux-gnueabi/bin/arm-linux-gnueabihf-g++.exe -O3 -mfpu=neon -mtune=cortex-a9 -mcpu=cortex-a9 -mfloat-abi=hard -Wall -Wpedantic -Wno-narrowing -Wno-deprecated -DNDEBUG -std=gnu++14 -I ../../ -DDNN_USE_IMAGE_API train.cpp -o train
 ```
 
 SD カードに ```train, data/``` をコピーして Zynq の Linux 上で
@@ -39,10 +39,9 @@ root@Cora-Z7-07S:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs
 
 ### 残件
 
-- ちゃんと DMA に対応した Petalinux を作る
 - AXI-Stream マスタは最後の転送で LAST を出す
 - 転送と演算と並列実行する
   - ユーザ空間 ⇔ DMA バッファ間の転送
   - DMA バッファ ⇔ IP 内バッファの転送
   - 演算コア → IP 内バッファの転送
-- ZynqMP で IOMMU(SMMU) を使ってみる (持ってないけど…)
+- ZynqMP で IOMMU(SMMU) を使ってみる

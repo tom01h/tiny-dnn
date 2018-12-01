@@ -12,8 +12,8 @@
 
 #define DNN_BASE   (0x40000000)
 #define DMA_BASE   (0x40400000)
-#define SRC_BASE   (0x1c000000)
-#define DST_BASE   (0x1e000000)
+#define SRC_BASE   (0x1ff00000)
+#define DST_BASE   (0x1ff80000)
 int dnn_addr;
 int dma_addr;
 int src_addr;

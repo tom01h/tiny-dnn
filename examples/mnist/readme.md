@@ -66,10 +66,10 @@ FPGA にもっていくときは、同じところを PL を操作するよう�
 5. アドレスマップは下記参照
 
 | master | slave module         | Start Address | End Address |
-|--------|----------------------|---------------|-------------|
+| ------ | -------------------- | ------------- | ----------- |
 | PS7    | tiny_dnn Accelerator | 4000_0000     | 4000_FFFF   |
 |        | AXI DMA              | 4040_0000     | 4040_FFFF   |
-| DMA    | DDR                  | 1C00_0000     | 1FFF_FFFF   |
+| DMA    | DDR                  | 1FF0_0000     | 1FFF_FFFF   |
 
 ACP 周りで Critical Warning 出るけど、良く分からないので放置しています。
 
@@ -83,11 +83,6 @@ ACP 周りで Critical Warning 出るけど、良く分からないので放置�
 
 ### Petalinux を作る
 
-#### 暫定版
-DMA の Petalinux がうまく作れないので…  
-Vivado で Zynq PS と 2つのブロックRAM とつないでビットストリームを作る。  
-ブロックRAMは ```0x40000000-0x4000ffff``` と ```0x40400000-0x4040ffff``` にマップする。  
-PL のクロックは 100MHz に設定する。  
 Vivado でビットストリーム込みの hdf ファイルをエクスポート、```peta/project_1.sdk```にコピーして、
 
 ```
@@ -106,7 +101,7 @@ $ petalinux-config -c rootfs
 
 menuconfig の画面で ```Filesystem Packages -> misc -> gcc-runtime -> libstdc++``` を選択する。
 
-DMA 転送用のバッファ (0x1c000000-0x1fffffff) を確保して Linux が使わないようにする。  
+DMA 転送用のバッファ (0x1ff00000-0x1fffffff) を確保して Linux が使わないようにする。  
 また、DMA と tiny-dnn アクセラレータのレジスタ空間は uio にする。  
 具体的には ```CORA/system-user.dtsi``` で ```project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi``` を上書きして、
 
@@ -114,10 +109,27 @@ DMA 転送用のバッファ (0x1c000000-0x1fffffff) を確保して Linux が�
 $ petalinux-build
 ```
 
-bit ファイルは tiny_dnn アクセラレータの入った本物をコピーしてきて使う。
+[こんな理由](https://forums.xilinx.com/t5/Embedded-Linux/Error-in-add-dma-coherent-prop-cannot-generate-device-tree/td-p/811337) で 1回 ERROR で落ちます。
+
+バグがあるようなので ```build/tmp/work/plnx_zynq7-xilinx-linux-gnueabi/device-tree/xilinx+gitAUTOINC+f38738e568-r0/git/axi_dma/data/axi_dma.tcl``` を変更。
 
 ```
-$ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga ../design_1_wrapper.bit --u-boot
+ proc add_dma_coherent_prop {drv_handle intf} {
++    hsi::utils::add_new_property $drv_handle "dma-coherent" boolean ""
++    return
++
+```
+
+もう一度
+
+```
+$ petalinux-build
+```
+
+今度は成功したはずです。続けて、
+
+```
+$ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga mages/linux/system.bit --u-boot
 ```
 
 生成物は ```images/linux/BOOT.bin, image.ub, rootfs.ext4``` です。
@@ -125,10 +137,10 @@ $ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga ../d
 rootfs.ext4 を書き込む。
 
 ```
-$ sudo dd if=images/linux/rootfs.ext4 of=/dev/sdb2 bs=1M conv=noerror
-$ sync
+$ sudo dd if=images/linux/rootfs.ext4 of=/dev/sdb2 bs=16M
+$ sudo sync
 $ sudo resize2fs /dev/sdb2
-$ sync
+$ sudo sync
 ```
 
 ### プログラムをコンパイルする

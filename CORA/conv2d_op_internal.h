@@ -6,6 +6,9 @@
     in the LICENSE file.
 */
 
+#define SRC_BASE   (0x1ff00000)
+#define DST_BASE   (0x1ff80000)
+
 extern int dnn_addr;
 extern int dma_addr;
 extern int src_addr;
@@ -92,7 +95,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
     // AXI DMA transfer tx
     REG(dma_addr+ 0x00) = 1;
-    REG(dma_addr+ 0x18) = 0x1c000000;
+    REG(dma_addr+ 0x18) = SRC_BASE;
     REG(dma_addr+ 0x28) = od*id*kh*kw*4;
 
     while ((REG(dma_addr+ 0x04) & 0x3)==0); // Wait for the tx to finish
@@ -118,7 +121,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
     // AXI DMA transfer tx
     REG(dma_addr+ 0x00) = 1;
-    REG(dma_addr+ 0x18) = 0x1c000000;
+    REG(dma_addr+ 0x18) = SRC_BASE;
     REG(dma_addr+ 0x28) = od*4;
 
     while ((REG(dma_addr+ 0x04) & 0x3)==0); // Wait for the tx to finish
@@ -146,12 +149,12 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
       // AXI DMA transfer rx
       REG(dma_addr+ 0x30) = 1;
-      REG(dma_addr+ 0x48) = 0x1e000000;
+      REG(dma_addr+ 0x48) = DST_BASE;
       REG(dma_addr+ 0x58) = ow*oh*od*4;
 
       // AXI DMA transfer tx
       REG(dma_addr+ 0x00) = 1;
-      REG(dma_addr+ 0x18) = 0x1c000000;
+      REG(dma_addr+ 0x18) = SRC_BASE;
       REG(dma_addr+ 0x28) = iw*ih*id*4;
 
       // Wait for the tx to finish
@@ -276,7 +279,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
   // AXI DMA transfer tx
   REG(dma_addr+ 0x00) = 1;
-  REG(dma_addr+ 0x18) = 0x1c000000;
+  REG(dma_addr+ 0x18) = SRC_BASE;
   REG(dma_addr+ 0x28) = od*id*kh*kw*4;
 
   while ((REG(dma_addr+ 0x04) & 0x3)==0); // Wait for the tx to finish
@@ -304,12 +307,12 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     // AXI DMA transfer rx
     REG(dma_addr+ 0x30) = 1;
-    REG(dma_addr+ 0x48) = 0x1e000000;
+    REG(dma_addr+ 0x48) = DST_BASE;
     REG(dma_addr+ 0x58) = iw*ih*id*4;
 
     // AXI DMA transfer tx
     REG(dma_addr+ 0x00) = 1;
-    REG(dma_addr+ 0x18) = 0x1c000000;
+    REG(dma_addr+ 0x18) = SRC_BASE;
     REG(dma_addr+ 0x28) = ow*oh*od*4;
 
     // Wait for the tx to finish
@@ -365,7 +368,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     // AXI DMA transfer tx
     REG(dma_addr+ 0x00) = 1;
-    REG(dma_addr+ 0x18) = 0x1c000000;
+    REG(dma_addr+ 0x18) = SRC_BASE;
     REG(dma_addr+ 0x28) = ow*oh*od*4;
 
     while ((REG(dma_addr+ 0x04) & 0x3)==0); // Wait for the tx to finish
@@ -387,12 +390,12 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     // AXI DMA transfer rx
     REG(dma_addr+ 0x30) = 1;
-    REG(dma_addr+ 0x48) = 0x1e000000;
+    REG(dma_addr+ 0x48) = DST_BASE;
     REG(dma_addr+ 0x58) = kw*kh*id*od*4;
 
     // AXI DMA transfer tx
     REG(dma_addr+ 0x00) = 1;
-    REG(dma_addr+ 0x18) = 0x1c000000;
+    REG(dma_addr+ 0x18) = SRC_BASE;
     REG(dma_addr+ 0x28) = iw*ih*id*4;
 
     // Wait for the tx to finish
