@@ -10,14 +10,12 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#define DNN_BASE   (0x40000000)
-#define DMA_BASE   (0x40400000)
 #define SRC_BASE   (0x1ff00000)
 #define DST_BASE   (0x1ff80000)
-int dnn_addr;
-int dma_addr;
-int src_addr;
-int dst_addr;
+volatile int *dnn_addr;
+volatile int *dma_addr;
+float *src_addr;
+float *dst_addr;
 
 #include <iostream>
 
@@ -160,26 +158,26 @@ int main(int argc, char **argv) {
   }
 
   /* ARM(CPU)から見た物理アドレス → 仮想アドレスへのマッピング */
-  dnn_addr = (int)mmap(NULL, 0x10000, PROT_READ | PROT_WRITE, MAP_SHARED, dnn, 0);
-  if (dnn_addr == (int)MAP_FAILED) {
+  dnn_addr = (int*)mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, dnn, 0);
+  if (dnn_addr == MAP_FAILED) {
     perror("mmap");
     close(fd);
     return -1;
   }
-  dma_addr = (int)mmap(NULL, 0x10000, PROT_READ | PROT_WRITE, MAP_SHARED, dma, 0);
-  if (dma_addr == (int)MAP_FAILED) {
+  dma_addr = (int*)mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, dma, 0);
+  if (dma_addr == MAP_FAILED) {
     perror("mmap");
     close(fd);
     return -1;
   }
-  src_addr = (int)mmap(NULL, 0x02000000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, SRC_BASE);
-  if (src_addr == (int)MAP_FAILED) {
+  src_addr = (float*)mmap(NULL, 0x00080000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, SRC_BASE);
+  if (src_addr == MAP_FAILED) {
     perror("mmap");
     close(fd);
     return -1;
   }
-  dst_addr = (int)mmap(NULL, 0x02000000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, DST_BASE);
-  if (dst_addr == (int)MAP_FAILED) {
+  dst_addr = (float*)mmap(NULL, 0x00080000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, DST_BASE);
+  if (dst_addr == MAP_FAILED) {
     perror("mmap");
     close(fd);
     return -1;

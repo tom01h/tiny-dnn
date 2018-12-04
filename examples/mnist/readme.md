@@ -129,7 +129,7 @@ $ petalinux-build
 今度は成功したはずです。続けて、
 
 ```
-$ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga mages/linux/system.bit --u-boot
+$ petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga images/linux/system.bit --u-boot
 ```
 
 生成物は ```images/linux/BOOT.bin, image.ub, rootfs.ext4``` です。
