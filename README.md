@@ -40,8 +40,10 @@ root@Cora-Z7-07S:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs
 ### 残件
 
 - AXI-Stream マスタは最後の転送で LAST を出す
+- バス幅を広げる
 - 転送と演算と並列実行する
-  - ユーザ空間 ⇔ DMA バッファ間の転送
+  - (済) ユーザ空間 ⇔ DMA バッファ間の転送
   - DMA バッファ ⇔ IP 内バッファの転送
   - 演算コア → IP 内バッファの転送
+- udmabuf を使ってみる
 - ZynqMP で IOMMU(SMMU) を使ってみる
