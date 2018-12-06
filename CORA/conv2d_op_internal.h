@@ -404,8 +404,15 @@ void conv2d_op_internal(const tensor_t &prev_out,
   while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
 
   // DMA Buffer
-  for(size_t i=0;i<ow*oh*od;i++){
-    src_addr[i] = curr_delta[0][i];
+  size_t p=0;
+  for(size_t i=0;i<od;i++){
+    float_t sum={0};
+    for(size_t j=0;j<ow*oh;j++){
+      src_addr[p] = curr_delta[0][p];
+      sum += curr_delta[0][p];
+      p++;
+    }
+    db[0][i] = sum;
   }
 
   dnn_addr[0] = 0; // init
@@ -445,8 +452,15 @@ void conv2d_op_internal(const tensor_t &prev_out,
   // Wait for the tx to finish
   while ((dma_addr[0x04/4] & 0x3)==0);
 
-  for(size_t i=0;i<ow*oh*od;i++){
-    src_addr[i] = curr_delta[1][i];
+  p=0;
+  for(size_t i=0;i<od;i++){
+    float_t sum={0};
+    for(size_t j=0;j<ow*oh;j++){
+      src_addr[p] = curr_delta[1][p];
+      sum += curr_delta[1][p];
+      p++;
+    }
+    db[1][i] = sum;
   }
 
   for(size_t i=0;i<iw*ih*id;i++){
@@ -457,16 +471,6 @@ void conv2d_op_internal(const tensor_t &prev_out,
   while ((dma_addr[0x34/4] & 0x3)==0) ;
 
   dnn_addr[0] = 0; // idle
-
-  // accumulate db
-  if (params.has_bias) {
-    for (size_t outc = 0; outc < params.out.depth_; outc++) {
-      size_t idx            = params.out.get_index(0, 0, outc);
-      const float_t *delta  = &curr_delta[0][idx];
-      const float_t *deltaa = delta + params.out.width_ * params.out.height_;
-      db[0][outc] += std::accumulate(delta, deltaa, float_t{0});
-    }
-  }
 
   for (size_t sample = 1; sample < prev_out.size(); sample++) {
     // AXI DMA reset
@@ -510,8 +514,15 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     if(sample != prev_out.size()-1){
       // DMA Buffer
-      for(size_t i=0;i<ow*oh*od;i++){
-        src_addr[i] = curr_delta[sample+1][i];
+      p=0;
+      for(size_t i=0;i<od;i++){
+        float_t sum={0};
+        for(size_t j=0;j<ow*oh;j++){
+          src_addr[p] = curr_delta[sample+1][p];
+          sum += curr_delta[sample+1][p];
+          p++;
+        }
+        db[sample+1][i] = sum;
       }
 
       // in data
@@ -524,16 +535,6 @@ void conv2d_op_internal(const tensor_t &prev_out,
     while ((dma_addr[0x34/4] & 0x3)==0) ;
 
     dnn_addr[0] = 0; // idle
-
-    // accumulate db
-    if (params.has_bias) {
-      for (size_t outc = 0; outc < params.out.depth_; outc++) {
-        size_t idx            = params.out.get_index(0, 0, outc);
-        const float_t *delta  = &curr_delta[sample][idx];
-        const float_t *deltaa = delta + params.out.width_ * params.out.height_;
-        db[sample][outc] += std::accumulate(delta, deltaa, float_t{0});
-      }
-    }
   }
 
   dnn_addr[0] = 4; // run
