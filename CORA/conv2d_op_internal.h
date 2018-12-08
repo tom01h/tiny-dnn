@@ -277,6 +277,8 @@ void conv2d_op_internal(const tensor_t &prev_out,
   size_t kw          = params.weight.width_;
   size_t kh          = params.weight.height_;
 
+  if(id!=1){
+
   dnn_addr[ 5] = ow*oh*od-1; //ss
   dnn_addr[ 6] = od-1;       //id
   dnn_addr[ 7] = ow*oh;      //is
@@ -401,6 +403,8 @@ void conv2d_op_internal(const tensor_t &prev_out,
   }
 
   dnn_addr[ 0] = 0; // idle
+
+  }
 
   cbt += std::chrono::high_resolution_clock::now() - cst;
   if(++cb==3750) std::cout << "cov back "

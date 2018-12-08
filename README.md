@@ -33,7 +33,7 @@ root@Cora-Z7-07S:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs
 説明は ```examples/mnist/readme.md``` に整備中です。
 
 このくらい高速になります。  
-ぎりぎり1分切って、ほぼ 4倍高速になりました。
+ただし、入力データの傾きを求める計算をスキップする変更をソフトウェアに入れています。
 
 ![](speed.svg)
 
@@ -45,5 +45,5 @@ root@Cora-Z7-07S:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs
   - (済) ユーザ空間 ⇔ DMA バッファ間の転送
   - DMA バッファ ⇔ IP 内バッファの転送
   - 演算コア → IP 内バッファの転送
-- udmabuf を使ってみる
+- (済) udmabuf を使ってみる
 - ZynqMP で IOMMU(SMMU) を使ってみる
