@@ -158,7 +158,11 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
       // AXI DMA transfer rx
       dma_addr[0x30/4] = 1;
-      dma_addr[0x48/4] = phys_addr+0x80000;
+      if(sample&0x1){
+        dma_addr[0x48/4] = phys_addr+0xc0000;
+      }else{
+        dma_addr[0x48/4] = phys_addr+0x80000;
+      }
       dma_addr[0x58/4] = ow*oh*od*4;
 
       // AXI DMA transfer tx
@@ -170,7 +174,11 @@ inline void conv2d_op_internal(const tensor_t &in_data,
       while ((dma_addr[0x04/4] & 0x3)==0);
 
       for(size_t i=0;i<od*oh*ow;i++){
-        out_data[sample-1][i] = dst_addr[i];
+        if(sample&0x1){
+          out_data[sample-1][i] = dst_addr[i];
+        }else{
+          out_data[sample-1][i] = dst_addr[i+0x40000/4];
+        }
       }
 
       if(sample != in_data.size()-1){
@@ -185,7 +193,11 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     }
 
     for(size_t i=0;i<od*oh*ow;i++){
-      out_data[in_data.size()-1][i] = dst_addr[i];
+      if((in_data.size()-1)&0x1){
+        out_data[in_data.size()-1][i] = dst_addr[i+0x40000/4];
+      }else{
+        out_data[in_data.size()-1][i] = dst_addr[i];
+      }
     }
 
     dnn_addr[0] = 0; // idle
@@ -235,7 +247,8 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   cft += std::chrono::high_resolution_clock::now() - cst;
   if(in_data.size()>1){
     if(++cf==3750) std::cout << "cov forward "
-                             << std::chrono::duration_cast<std::chrono::milliseconds>(cft).count() << "ms elapsed"
+                             << std::chrono::duration_cast<std::chrono::milliseconds>(cft).count()
+                             << "ms elapsed"
                              << std::endl;
   }
 }
@@ -345,7 +358,11 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     // AXI DMA transfer rx
     dma_addr[0x30/4] = 1;
-    dma_addr[0x48/4] = phys_addr+0x80000;
+    if(sample&0x1){  
+      dma_addr[0x48/4] = phys_addr+0xc0000;
+    }else{
+      dma_addr[0x48/4] = phys_addr+0x80000;
+    }
     dma_addr[0x58/4] = iw*ih*id*4;
 
     // AXI DMA transfer tx
@@ -357,7 +374,11 @@ void conv2d_op_internal(const tensor_t &prev_out,
     while ((dma_addr[0x04/4] & 0x3)==0);
 
     for(size_t i=0;i<id*ih*iw;i++){
-      prev_delta[sample-1][i] = dst_addr[i];
+      if(sample&0x1){  
+        prev_delta[sample-1][i] = dst_addr[i];
+      }else{
+        prev_delta[sample-1][i] = dst_addr[i+0x40000/4];
+      }
     }
 
     if(sample != prev_out.size()-1){
@@ -372,14 +393,19 @@ void conv2d_op_internal(const tensor_t &prev_out,
   }
 
   for(size_t i=0;i<id*ih*iw;i++){
-    prev_delta[prev_out.size()-1][i] = dst_addr[i];
+    if((prev_out.size()-1)&0x1){  
+      prev_delta[prev_out.size()-1][i] = dst_addr[i+0x40000/4];
+    }else{
+      prev_delta[prev_out.size()-1][i] = dst_addr[i];
+    }
   }
 
   dnn_addr[ 0] = 0; // idle
 
   cbt += std::chrono::high_resolution_clock::now() - cst;
   if(++cb==3750) std::cout << "cov back "
-                           << std::chrono::duration_cast<std::chrono::milliseconds>(cbt).count() << "ms elapsed"
+                           << std::chrono::duration_cast<std::chrono::milliseconds>(cbt).count()
+                           << "ms elapsed"
                            << std::endl;
 
   cst = std::chrono::high_resolution_clock::now();
@@ -501,7 +527,11 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     // AXI DMA transfer rx
     dma_addr[0x30/4] = 1;
-    dma_addr[0x48/4] = phys_addr+0x80000;
+    if(sample&0x1){
+      dma_addr[0x48/4] = phys_addr+0xc0000;
+    }else{
+      dma_addr[0x48/4] = phys_addr+0x80000;
+    }
     dma_addr[0x58/4] = kw*kh*id*od*4;
 
     // AXI DMA transfer tx
@@ -513,7 +543,11 @@ void conv2d_op_internal(const tensor_t &prev_out,
     while ((dma_addr[0x04/4] & 0x3)==0);
 
     for(size_t i=0;i<kw*kh*id*od;i++){
-      dW[sample-1][i] = dst_addr[i];
+      if(sample&0x1){
+        dW[sample-1][i] = dst_addr[i];
+      }else{
+        dW[sample-1][i] = dst_addr[i+0x40000/4];
+      }
     }
 
     if(sample != prev_out.size()-1){
@@ -543,14 +577,19 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
   dnn_addr[0] = 4; // run
   for(size_t i=0;i<kw*kh*id*od;i++){
-    dW[prev_out.size()-1][i] = dst_addr[i];
+    if((prev_out.size()-1)&0x1){
+      dW[prev_out.size()-1][i] = dst_addr[i+0x40000/4];
+    }else{
+      dW[prev_out.size()-1][i] = dst_addr[i];
+    }
   }
   dnn_addr[0] = 0; // idle
 
   cdt += std::chrono::high_resolution_clock::now() - cst;
   if(cb==3750) std::cout << "delta param "
-                           << std::chrono::duration_cast<std::chrono::milliseconds>(cdt).count() << "ms elapsed"
-                           << std::endl;
+                         << std::chrono::duration_cast<std::chrono::milliseconds>(cdt).count()
+                         << "ms elapsed"
+                         << std::endl;
 }
 
 }  // namespace kernels
