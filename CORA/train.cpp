@@ -10,12 +10,11 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#define SRC_BASE   (0x1ff00000)
-#define DST_BASE   (0x1ff80000)
 volatile int *dnn_addr;
 volatile int *dma_addr;
 float *src_addr;
 float *dst_addr;
+unsigned long phys_addr;
 
 #include <iostream>
 
@@ -143,8 +142,15 @@ int main(int argc, char **argv) {
 
   int fd,dma,dnn;
 
+  if ((fd  = open("/sys/class/udmabuf/udmabuf0/phys_addr", O_RDONLY)) != -1) {
+    char attr[1024];
+    read(fd, attr, 1024);
+    sscanf(attr, "%lx", &phys_addr);
+    close(fd);
+  }
+
   /* メモリアクセス用のデバイスファイルを開く */
-  if ((fd = open("/dev/mem", O_RDWR)) < 0) {
+  if ((fd = open("/dev/udmabuf0", O_RDWR)) < 0) {
     perror("open");
     return -1;
   }
@@ -170,18 +176,13 @@ int main(int argc, char **argv) {
     close(fd);
     return -1;
   }
-  src_addr = (float*)mmap(NULL, 0x00080000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, SRC_BASE);
+  src_addr = (float*)mmap(NULL, 0x00100000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (src_addr == MAP_FAILED) {
     perror("mmap");
     close(fd);
     return -1;
   }
-  dst_addr = (float*)mmap(NULL, 0x00080000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, DST_BASE);
-  if (dst_addr == MAP_FAILED) {
-    perror("mmap");
-    close(fd);
-    return -1;
-  }
+  dst_addr = src_addr+0x80000/4;
 
   if (argc == 2) {
     std::string argname(argv[1]);

@@ -69,7 +69,7 @@ FPGA にもっていくときは、同じところを PL を操作するよう�
 | ------ | -------------------- | ------------- | ----------- |
 | PS7    | tiny_dnn Accelerator | 4000_0000     | 4000_FFFF   |
 |        | AXI DMA              | 4040_0000     | 4040_FFFF   |
-| DMA    | DDR                  | 1FF0_0000     | 1FFF_FFFF   |
+| DMA    | DDR                  | 0000_0000     | 1FFF_FFFF   |
 
 ACP 周りで Critical Warning 出るけど、良く分からないので放置しています。
 
@@ -101,8 +101,20 @@ $ petalinux-config -c rootfs
 
 menuconfig の画面で ```Filesystem Packages -> misc -> gcc-runtime -> libstdc++``` を選択する。
 
-DMA 転送用のバッファ (0x1ff00000-0x1fffffff) を確保して Linux が使わないようにする。  
-また、DMA と tiny-dnn アクセラレータのレジスタ空間は uio にする。  
+DMA 転送に使うバッファ用に [udmabuf](https://github.com/ikwzm/udmabuf/blob/master/Readme.ja.md) を作る。
+
+```petalinux-create -t modules --name mymodule --enable
+$ petalinux-create -t modules --name udmabuf --enable
+$ petalinux-build -c rootfs
+```
+
+ダウンロードしたファイルで ```project-spec/meta-user/recipes-modules/udmabuf/files/``` を置き換えて、
+
+```
+$ petalinux-build -c udmabuf
+```
+
+udmabuf の設定をして、DMA と tiny-dnn アクセラレータのレジスタ空間を uio にする。  
 具体的には ```CORA/system-user.dtsi``` で ```project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi``` を上書きして、
 
 ```
@@ -158,6 +170,7 @@ Petalinux ファイル ```images/linux/BOOT.bin, image.ub``` と、コンパイ�
 ブート後、Zynq の Linux 上で
 
 ```
+root@tiny-dnn:~# insmod /lib/modules/4.14.0-xilinx-v2018.2/extra/udmabuf.ko udmabuf0=1048576
 root@tiny-dnn:~# mount /dev/mmcblk0p1 /mnt/
 root@tiny-dnn:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs 1 --minibatch_size 16 --backend_type internal
 ```

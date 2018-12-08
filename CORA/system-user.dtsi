@@ -4,17 +4,6 @@
         bootargs = "console=ttyPS0,115200 earlyprintk uio_pdrv_genirq.of_id=generic-uio root=/dev/mmcblk0p2 rw rootwait";
         stdout-path = "serial0:115200n8";
     };
-
-    reserved-memory {
-        #address-cells = <1>;
-        #size-cells = <1>;
-        ranges;
-
-        dma_reserved: dma@0x1ff00000 {
-            reusable;
-            reg = <0x1ff00000 0x00100000>;
-        };
-    };
 };
 
 &axi_dma_0 {
