@@ -9,7 +9,7 @@
 
 #include <chrono>    // for high_resolution_clock, NOLINT
 std::chrono::high_resolution_clock::time_point cst;
-std::chrono::high_resolution_clock::duration cft, cbt;
+std::chrono::high_resolution_clock::duration cft, cbt, cdt;
 
 int cf=0;
 int cb=0;
@@ -99,6 +99,9 @@ void conv2d_op_internal(const tensor_t &prev_out,
   typedef typename vec_t::value_type float_t;
 
   cst = std::chrono::high_resolution_clock::now();
+
+  if(params.in.depth_ !=1){
+
   for_i(parallelize, prev_out.size(), [&](size_t sample) {
     // propagate delta to previous layer
     for (size_t inc = 0; inc < params.in.depth_; inc++) {
@@ -139,6 +142,16 @@ void conv2d_op_internal(const tensor_t &prev_out,
       }
     }
 
+  });
+
+  }
+
+  cbt += std::chrono::high_resolution_clock::now() - cst;
+  if(++cb==3750) std::cout << "cov back "
+                           << std::chrono::duration_cast<std::chrono::milliseconds>(cbt).count() << "ms elapsed"
+                           << std::endl;
+  cst = std::chrono::high_resolution_clock::now();
+  for_i(parallelize, prev_out.size(), [&](size_t sample) {
     // accumulate dw
     for (size_t inc = 0; inc < params.in.depth_; inc++) {
       for (size_t outc = 0; outc < params.out.depth_; outc++) {
@@ -191,9 +204,9 @@ void conv2d_op_internal(const tensor_t &prev_out,
       }
     }
   });
-  cbt += std::chrono::high_resolution_clock::now() - cst;
-  if(++cb==3750) std::cout << "cov back "
-                           << std::chrono::duration_cast<std::chrono::milliseconds>(cbt).count() << "ms elapsed"
+  cdt += std::chrono::high_resolution_clock::now() - cst;
+  if(cb==3750) std::cout << "delta param "
+                           << std::chrono::duration_cast<std::chrono::milliseconds>(cdt).count() << "ms elapsed"
                            << std::endl;
 }
 
