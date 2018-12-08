@@ -15,7 +15,7 @@ tiny-dnn アクセラレータの入出力データ型は 32bit Float 型です�
 アクセラレータコアの構成は、次のような4段パイプ構成です。  
 全体的に、丸めは省略して切り捨てにしています。
 
-![core](C:\Users\tom01\AI\tiny-dnn\examples\mnist\core.svg)
+![core](core.svg)
 
 #### 1サイクル目
 
