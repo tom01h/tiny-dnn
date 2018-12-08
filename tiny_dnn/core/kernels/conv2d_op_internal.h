@@ -261,6 +261,8 @@ void conv2d_op_internal(const tensor_t &prev_out,
   // params.h_stride
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
 
+    if(id!=1){ // because input delta NOT USED
+
     size_t ina=0;
     size_t outa=0;
     const vec_t &in = curr_delta[sample];
@@ -278,6 +280,8 @@ void conv2d_op_internal(const tensor_t &prev_out,
       conv.i = verilator_top->dst_data;
       a[outa++] = conv.f;
       eval();
+    }
+
     }
 
     // propagate delta to previous layer
