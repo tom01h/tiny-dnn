@@ -27,8 +27,14 @@ SD カードに ```train, data/``` をコピーして Zynq の Linux 上で
 root@Cora-Z7-07S:~# mount /dev/mmcblk0p1 /mnt/
 root@Cora-Z7-07S:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs 1 --minibatch_size 16 --backend_type internal
 ```
+#### ZynqMP の場合は
+コンパイルコマンドを以下に変更
+```
+$ ${SDK path}/gnu/aarch64/nt/aarch64-linux/bin/aarch64-linux-gnu-g++.exe -O3 -mtune=cortex-a53 -mcpu=cortex-a53 -Wall -Wpedantic -Wno-narrowing -Wno-deprecated -DNDEBUG -std=gnu++14 -I ../../ -DDNN_USE_IMAGE_API train.cpp -o train
+```
 
 ## アクセラレータ実装中
+
 畳み込みの行列乗算を 16MAC で並列に計算して学習を加速します。  
 説明は ```examples/mnist/readme.md``` に整備中です。
 
