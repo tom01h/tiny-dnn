@@ -56,10 +56,12 @@ module batch_ctrl
       end else if(dst_a!=ds)begin
          if(dst_vi&dst_ready)
            dst_a <= dst_a + 1;
-      end else begin
+      end else if(dst_ready)begin
          dst_vi <= 1'b0;
       end
-      dst_valid <= dst_vi;
+      if(dst_ready)begin
+         dst_valid <= dst_vi;
+      end
    end
 endmodule
 
