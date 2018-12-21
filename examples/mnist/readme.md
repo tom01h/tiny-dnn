@@ -117,6 +117,8 @@ $ petalinux-build -c udmabuf
 ```
 
 udmabuf の設定をして、DMA と tiny-dnn アクセラレータのレジスタ空間を uio にする。  
+DMA に ```dma-coherent``` を設定する。  
+デバイスツリーに ```dma-coherent``` 付きで udmabuf を追加する。  
 具体的には ```CORA/system-user.dtsi``` で ```project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi``` を上書きして、
 
 ```
@@ -172,7 +174,6 @@ Petalinux ファイル ```images/linux/BOOT.bin, image.ub``` と、コンパイ�
 ブート後、Zynq の Linux 上で
 
 ```
-root@tiny-dnn:~# insmod /lib/modules/4.14.0-xilinx-v2018.2/extra/udmabuf.ko udmabuf0=1048576
 root@tiny-dnn:~# mount /dev/mmcblk0p1 /mnt/
 root@tiny-dnn:~# /mnt/train --data_path /mnt/data/ --learning_rate 1 --epochs 1 --minibatch_size 16 --backend_type internal
 ```

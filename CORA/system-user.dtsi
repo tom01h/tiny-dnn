@@ -4,6 +4,30 @@
         bootargs = "console=ttyPS0,115200 earlyprintk uio_pdrv_genirq.of_id=generic-uio root=/dev/mmcblk0p2 rw rootwait";
         stdout-path = "serial0:115200n8";
     };
+    udmabuf@0 {
+        compatible = "ikwzm,udmabuf-0.10.a";
+        device-name = "udmabuf0";
+        size = <0x040000>; // 256KB
+        dma-coherent;
+    };
+    udmabuf@1 {
+        compatible = "ikwzm,udmabuf-0.10.a";
+        device-name = "udmabuf1";
+        size = <0x040000>; // 256KB
+        dma-coherent;
+    };
+    udmabuf@2 {
+        compatible = "ikwzm,udmabuf-0.10.a";
+        device-name = "udmabuf2";
+        size = <0x040000>; // 256KB
+        dma-coherent;
+    };
+    udmabuf@3 {
+        compatible = "ikwzm,udmabuf-0.10.a";
+        device-name = "udmabuf3";
+        size = <0x040000>; // 256KB
+        dma-coherent;
+    };
 };
 
 &axi_dma_0 {

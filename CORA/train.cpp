@@ -12,9 +12,14 @@
 
 volatile int *dnn_addr;
 volatile int *dma_addr;
-float *src_addr;
-float *dst_addr;
-unsigned long phys_addr;
+float *src0_addr;
+float *src1_addr;
+float *dst0_addr;
+float *dst1_addr;
+unsigned long src0_phys;
+unsigned long src1_phys;
+unsigned long dst0_phys;
+unsigned long dst1_phys;
 
 #include <iostream>
 
@@ -140,17 +145,47 @@ int main(int argc, char **argv) {
   int minibatch_size                     = 16;
   tiny_dnn::core::backend_t backend_type = tiny_dnn::core::default_engine();
 
-  int fd,dma,dnn;
+  int fd0,fd1,fd2,fd3,dma,dnn;
 
-  if ((fd  = open("/sys/class/udmabuf/udmabuf0/phys_addr", O_RDONLY)) != -1) {
+  if ((fd0  = open("/sys/class/udmabuf/udmabuf0/phys_addr", O_RDONLY)) != -1) {
     char attr[1024];
-    read(fd, attr, 1024);
-    sscanf(attr, "%lx", &phys_addr);
-    close(fd);
+    read(fd0, attr, 1024);
+    sscanf(attr, "%lx", &src0_phys);
+    close(fd0);
+  }
+  if ((fd0  = open("/sys/class/udmabuf/udmabuf1/phys_addr", O_RDONLY)) != -1) {
+    char attr[1024];
+    read(fd0, attr, 1024);
+    sscanf(attr, "%lx", &src1_phys);
+    close(fd0);
+  }
+  if ((fd0  = open("/sys/class/udmabuf/udmabuf2/phys_addr", O_RDONLY)) != -1) {
+    char attr[1024];
+    read(fd0, attr, 1024);
+    sscanf(attr, "%lx", &dst0_phys);
+    close(fd0);
+  }
+  if ((fd0  = open("/sys/class/udmabuf/udmabuf3/phys_addr", O_RDONLY)) != -1) {
+    char attr[1024];
+    read(fd0, attr, 1024);
+    sscanf(attr, "%lx", &dst1_phys);
+    close(fd0);
   }
 
   /* メモリアクセス用のデバイスファイルを開く */
-  if ((fd = open("/dev/udmabuf0", O_RDWR)) < 0) {
+  if ((fd0 = open("/dev/udmabuf0", O_RDWR)) < 0) {
+    perror("open");
+    return -1;
+  }
+  if ((fd1 = open("/dev/udmabuf1", O_RDWR)) < 0) {
+    perror("open");
+    return -1;
+  }
+  if ((fd2 = open("/dev/udmabuf2", O_RDWR)) < 0) {
+    perror("open");
+    return -1;
+  }
+  if ((fd3 = open("/dev/udmabuf3", O_RDWR)) < 0) {
     perror("open");
     return -1;
   }
@@ -167,22 +202,39 @@ int main(int argc, char **argv) {
   dnn_addr = (int*)mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, dnn, 0);
   if (dnn_addr == MAP_FAILED) {
     perror("mmap");
-    close(fd);
+    close(dnn);
     return -1;
   }
   dma_addr = (int*)mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, dma, 0);
   if (dma_addr == MAP_FAILED) {
     perror("mmap");
-    close(fd);
+    close(dma);
     return -1;
   }
-  src_addr = (float*)mmap(NULL, 0x00100000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-  if (src_addr == MAP_FAILED) {
+  src0_addr = (float*)mmap(NULL, 0x00040000, PROT_READ | PROT_WRITE, MAP_SHARED, fd0, 0);
+  if (src0_addr == MAP_FAILED) {
     perror("mmap");
-    close(fd);
+    close(fd0);
     return -1;
   }
-  dst_addr = src_addr+0x80000/4;
+  src1_addr = (float*)mmap(NULL, 0x00040000, PROT_READ | PROT_WRITE, MAP_SHARED, fd1, 0);
+  if (src1_addr == MAP_FAILED) {
+    perror("mmap");
+    close(fd1);
+    return -1;
+  }
+  dst0_addr = (float*)mmap(NULL, 0x00040000, PROT_READ | PROT_WRITE, MAP_SHARED, fd2, 0);
+  if (dst0_addr == MAP_FAILED) {
+    perror("mmap");
+    close(fd2);
+    return -1;
+  }
+  dst1_addr = (float*)mmap(NULL, 0x00040000, PROT_READ | PROT_WRITE, MAP_SHARED, fd3, 0);
+  if (dst1_addr == MAP_FAILED) {
+    perror("mmap");
+    close(fd3);
+    return -1;
+  }
 
   if (argc == 2) {
     std::string argname(argv[1]);
