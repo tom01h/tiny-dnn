@@ -1,8 +1,9 @@
 # tiny-dnn を FPGA で実行する
 
-オリジナルの [tiny-dnn のリポジトリ](https://github.com/tiny-dnn/tiny-dnn)
+tiny-dnn の畳み込みレイヤを Zynq の PL 部に作ったアクセラレータ回路にオフロードすることで、CNN の学習を加速します。  
+課題は ```examples/mnist``` を使用、サンプルの Le-Net を今時の単純な CNN に変更・軽量化して実験中です。
 
-課題は ```examples/mnist``` を軽量化して実験中です。
+オリジナルの [tiny-dnn のリポジトリ](https://github.com/tiny-dnn/tiny-dnn)
 
 ## CPU だけで実行する
 
@@ -53,3 +54,4 @@ $ ${SDK path}/gnu/aarch64/nt/aarch64-linux/bin/aarch64-linux-gnu-g++.exe -O3 -mt
   - 演算コア → IP 内バッファの転送
 - (済) udmabuf を使ってみる
 - ZynqMP で IOMMU(SMMU) を使ってみる
+- SystemC も使ってみる

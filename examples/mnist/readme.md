@@ -6,7 +6,8 @@
 AXI Stream で 1サンプル分のデータを受け取り、core で畳み込み計算をして、AXI Stream で 1サンプル分の結果を吐き出します。  
 source buffer と destination buffer に 1サンプル分の入出力データを置くためのバッファを持ちます。  
 ウェイト用のバッファは core 内に持ちます。  
-sample controller で 1サンプル内の制御をして、batch controller でミニバッチ 1層の制御をします。
+sample controller で 1サンプル内の制御をして、batch controller でミニバッチ 1層の制御をします。  
+im2col は on the fly で実行するので、転送データとバッファメモリを節約できます。
 
 sample control に見直しが必要なところが残っていますが…  
 
@@ -15,7 +16,9 @@ sample control に見直しが必要なところが残っていますが…
 ## もう少し細かく
 
 ### sample controller
+on the fly で im2col を実行するためのアドレスを生成します。  
 batch controller からリクエストを受けて
+
 1. カーネルごとに
   - 入力データのアドレス(ia)を生成して入力データ(d)を取ってくる
   - core にウェイトのアドレス(wa)と入力データ(d)を渡して計算する
