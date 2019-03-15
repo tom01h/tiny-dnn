@@ -9,7 +9,7 @@ VERILATOR_OPTS = \
 	-Wno-WIDTH \
 	-Wno-UNUSED \
 	-Wno-BLKSEQ \
-	--cc \
+	--sc \
 	+1364-2001ext+v \
 	-Wno-fatal \
 	--Mdir sim \

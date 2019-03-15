@@ -7,36 +7,66 @@
 */
 
 // verilator
+#include "systemc.h"
 #include "unistd.h"
 #include "getopt.h"
 #include "Vtiny_dnn_top.h"
 #include "verilated.h"
-#include "verilated_vcd_c.h"
+#include "verilated_vcd_sc.h"
 
-#define VCD_PATH_LENGTH 256
+sc_time vcdstart(0,SC_NS);
+sc_time vcdend(300000,SC_NS);
 
-vluint64_t main_time = 0;
-vluint64_t vcdstart = 0;
-vluint64_t vcdend = vcdstart + 300000;
+int tfpv=0;
+VerilatedVcdSc * tfp;
 
-VerilatedVcdC* tfp;
-Vtiny_dnn_top* verilator_top;
+sc_signal <bool>      backprop;
+sc_signal <bool>      enbias;
+sc_signal <bool>      run;
+sc_signal <bool>      wwrite;
+sc_signal <bool>      bwrite;
+
+sc_signal <bool>      src_valid;
+sc_signal <uint32_t > src_data;
+sc_signal <bool>      src_last;
+sc_signal <bool>      src_ready;
+
+sc_signal <bool>      dst_valid;
+sc_signal <uint32_t > dst_data;
+sc_signal <bool>      dst_last;
+sc_signal <bool>      dst_ready;
+
+sc_signal <uint32_t > vss;
+sc_signal <uint32_t > vid;
+sc_signal <uint32_t > vis;
+sc_signal <uint32_t > vih;
+sc_signal <uint32_t > viw;
+sc_signal <uint32_t > vds;
+sc_signal <uint32_t > vod;
+sc_signal <uint32_t > vos;
+sc_signal <uint32_t > voh;
+sc_signal <uint32_t > vow;
+sc_signal <uint32_t > vfs;
+sc_signal <uint32_t > vks;
+sc_signal <uint32_t > vkh;
+sc_signal <uint32_t > vkw;
+// verilator
 
 void eval()
 {
-  verilator_top->clk = 0;
-  verilator_top->eval();
-  if((main_time>=vcdstart)&((main_time<vcdend)|(vcdend==0)))
-    tfp->dump(main_time);
+  if((tfpv==0)&(sc_time_stamp()>=vcdstart)){
+    tfpv=1;
+    tfp->open("tmp.vcd");
+  }
 
-  main_time += 5;
+  sc_start(10, SC_NS);
 
-  verilator_top->clk = 1;
-  verilator_top->eval();
-  if((main_time>=vcdstart)&((main_time<vcdend)|(vcdend==0)))
-    tfp->dump(main_time);
-
-  main_time += 5;
+  if(tfpv==1){
+    if(sc_time_stamp()>vcdend){
+      tfp->close();
+      tfpv=2;
+    }
+  }
 
   return;
 }
@@ -159,7 +189,7 @@ static void usage(const char *argv0) {
             << " --backend_type internal" << std::endl;
 }
 
-int main(int argc, char **argv) {
+int sc_main(int argc, char **argv) {
   double learning_rate                   = 1;
   int epochs                             = 1;
   std::string data_path                  = "";
@@ -194,15 +224,49 @@ int main(int argc, char **argv) {
   }
 
 // verilator
-  char vcdfile[VCD_PATH_LENGTH];
-  strncpy(vcdfile,"tmp.vcd",VCD_PATH_LENGTH);
+  Vtiny_dnn_top verilator_top("verilator_top");
   Verilated::commandArgs(argc, argv);
   Verilated::traceEverOn(true);
-  tfp = new VerilatedVcdC;
-  verilator_top = new Vtiny_dnn_top;
-  verilator_top->trace(tfp, 99); // requires explicit max levels param
-  tfp->open(vcdfile);
-  main_time = 0;
+  tfp = new VerilatedVcdSc;
+
+  verilator_top.trace(tfp, 99); // requires explicit max levels param
+
+  sc_clock clk ("clk", 10, SC_NS);
+
+  verilator_top.clk(clk);
+  verilator_top.backprop(backprop);
+  verilator_top.enbias(enbias);
+  verilator_top.run(run);
+  verilator_top.wwrite(wwrite);
+  verilator_top.bwrite(bwrite);
+
+  verilator_top.src_valid(src_valid);
+  verilator_top.src_data(src_data);
+  verilator_top.src_last(src_last);
+  verilator_top.src_ready(src_ready);
+
+  verilator_top.dst_valid(dst_valid);
+  verilator_top.dst_data(dst_data);
+  verilator_top.dst_last(dst_last);
+  verilator_top.dst_ready(dst_ready);
+
+  verilator_top.ss(vss);
+  verilator_top.id(vid);
+  verilator_top.is(vis);
+  verilator_top.ih(vih);
+  verilator_top.iw(viw);
+  verilator_top.ds(vds);
+  verilator_top.od(vod);
+  verilator_top.os(vos);
+  verilator_top.oh(voh);
+  verilator_top.ow(vow);
+  verilator_top.fs(vfs);
+  verilator_top.ks(vks);
+  verilator_top.kh(vkh);
+  verilator_top.kw(vkw);
+
+  sc_start(SC_ZERO_TIME);
+  sc_start(5, SC_NS);
 // verilator
 
   if (data_path == "") {
@@ -241,7 +305,5 @@ int main(int argc, char **argv) {
   } catch (tiny_dnn::nn_error &err) {
     std::cerr << "Exception: " << err.what() << std::endl;
   }
-  delete verilator_top;
-  tfp->close();
   return 0;
 }
