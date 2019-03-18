@@ -8,6 +8,7 @@
 
 // verilator
 #include "systemc.h"
+#include "tiny_dnn_sc_ctl.h"
 #include "unistd.h"
 #include "getopt.h"
 #include "Vtiny_dnn_top.h"
@@ -232,6 +233,23 @@ int sc_main(int argc, char **argv) {
   verilator_top.trace(tfp, 99); // requires explicit max levels param
 
   sc_clock clk ("clk", 10, SC_NS);
+
+  sc_signal <bool>         s_init;
+  sc_signal <bool>         k_init;
+  sc_signal <uint32_t>     ia;
+  sc_signal <uint32_t>     wa;
+
+  tiny_dnn_sc_ctl U_tiny_dnn_sc_ctl("U_tiny_dnn_sc_ctl");
+  U_tiny_dnn_sc_ctl.clk(clk);
+  U_tiny_dnn_sc_ctl.s_init(s_init);
+  U_tiny_dnn_sc_ctl.k_init(k_init);
+  U_tiny_dnn_sc_ctl.ia(ia);
+  U_tiny_dnn_sc_ctl.wa(wa);
+
+  verilator_top.s_init(s_init);
+  verilator_top.sc_k_init(k_init);
+  verilator_top.sc_ia(ia);
+  verilator_top.sc_wa(wa);
 
   verilator_top.clk(clk);
   verilator_top.backprop(backprop);

@@ -8,6 +8,11 @@ module tiny_dnn_top
    input wire         wwrite,
    input wire         bwrite,
 
+   output wire        s_init,
+   input wire         sc_k_init,
+   input wire [12:0]  sc_ia,
+   input wire [9:0]   sc_wa,
+
    input wire         src_valid,
    input wire [31:0]  src_data,
    input wire         src_last,
@@ -37,7 +42,6 @@ module tiny_dnn_top
    parameter f_num  = 16;
 
    //  batch control <-> sample control
-   wire               s_init;
    wire               s_fin;
 
    // sample control -> core

@@ -23,7 +23,7 @@ tiny_dnn_control.sv \
 tiny_dnn_buf.sv \
 tiny_dnn_core.sv \
 
-VERILATOR_CPP_TB = train.cpp
+VERILATOR_CPP_TB = train.cpp tiny_dnn_sc_ctl.cpp
 
 default: $(SIM_DIR)/Vtiny_dnn_top
 
