@@ -126,8 +126,8 @@ static void train_net(const std::string &data_dir_path,
   tiny_dnn::parse_mnist_images(data_dir_path + "/t10k-images.idx3-ubyte",
                                &test_images, -1.0, 1.0, 0, 0);
 
-  train_labels.resize(3008);
-  train_images.resize(3008);
+  train_labels.resize(1600);
+  train_images.resize(1600);
   //train_labels.resize(20000);
   //train_images.resize(20000);
   //train_labels.resize(32);
@@ -236,8 +236,13 @@ int sc_main(int argc, char **argv) {
 
   sc_signal <bool>         s_init;
   sc_signal <bool>         k_init;
-  sc_signal <uint32_t>     ia;
-  sc_signal <uint32_t>     wa;
+  sc_signal <bool>         exec;
+  sc_signal <bool>         k_fin;
+  sc_signal <bool>         o_fin;
+  sc_signal <sc_bv<4> >    outc;
+  sc_signal <sc_bv<13> >   ia;
+  sc_signal <sc_bv<10> >   wa;
+  sc_signal <sc_bv<13> >   oa;
 
   tiny_dnn_sc_ctl U_tiny_dnn_sc_ctl("U_tiny_dnn_sc_ctl");
   U_tiny_dnn_sc_ctl.clk(clk);
@@ -245,11 +250,21 @@ int sc_main(int argc, char **argv) {
   U_tiny_dnn_sc_ctl.k_init(k_init);
   U_tiny_dnn_sc_ctl.ia(ia);
   U_tiny_dnn_sc_ctl.wa(wa);
+  U_tiny_dnn_sc_ctl.oa(oa);
+  U_tiny_dnn_sc_ctl.exec(exec);
+  U_tiny_dnn_sc_ctl.k_fin(k_fin);
+  U_tiny_dnn_sc_ctl.o_fin(o_fin);
+  U_tiny_dnn_sc_ctl.outc(outc);
 
   verilator_top.s_init(s_init);
   verilator_top.sc_k_init(k_init);
+  verilator_top.sc_exec(exec);
+  verilator_top.sc_k_fin(k_fin);
+  verilator_top.sc_o_fin(o_fin);
+  verilator_top.sc_outc(outc);
   verilator_top.sc_ia(ia);
   verilator_top.sc_wa(wa);
+  verilator_top.sc_oa(oa);
 
   verilator_top.clk(clk);
   verilator_top.backprop(backprop);

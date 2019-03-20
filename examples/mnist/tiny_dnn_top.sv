@@ -10,8 +10,13 @@ module tiny_dnn_top
 
    output wire        s_init,
    input wire         sc_k_init,
-   input wire [12:0]  sc_ia,
-   input wire [9:0]   sc_wa,
+   input wire         sc_exec,
+   input wire         sc_k_fin,
+   input wire         sc_o_fin,
+   input wire [3:0]   sc_outc/*verilator sc_bv*/,
+   input wire [12:0]  sc_ia/*verilator sc_bv*/,
+   input wire [9:0]   sc_wa/*verilator sc_bv*/,
+   input wire [12:0]  sc_oa/*verilator sc_bv*/,
 
    input wire         src_valid,
    input wire [31:0]  src_data,

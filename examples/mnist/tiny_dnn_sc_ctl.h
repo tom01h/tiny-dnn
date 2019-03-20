@@ -6,22 +6,28 @@ SC_MODULE(tiny_dnn_sc_ctl)
   sc_in  <bool>         clk;
   sc_in  <bool>         s_init;
   sc_out <bool>         k_init;
-  //sc_out <sc_uint<13> > ia;
-  //sc_out <sc_uint<10> > wa;
-  sc_out <uint32_t >    ia;
-  sc_out <uint32_t >    wa;
+  sc_out <bool>         exec;
+  sc_out <bool>         k_fin;
+  sc_out <bool>         o_fin;
+  sc_out <sc_bv<4> >    outc;
+  sc_out <sc_bv<13> >   ia;
+  sc_out <sc_bv<10> >   wa;
+  sc_out <sc_bv<13> >   oa;
 
   //Variables
+  bool         k_fin_i;
+  bool         o_fin_i;
+  int          k_base;
 
-  //Process Declaration
-  void Prc1();
+  //Thread Declaration
+  void exect();
+  void outt();
 
   //Constructor
   SC_CTOR(tiny_dnn_sc_ctl)
   {
-    //Process Registration
-    SC_CTHREAD(Prc1,clk.pos());
-    //reset_signal_is(reset,true);
+    SC_CTHREAD(exect,clk.pos());
+    SC_CTHREAD(outt,clk.pos());
 
   }
 };
