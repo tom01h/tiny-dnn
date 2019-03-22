@@ -16,7 +16,7 @@
 #include "verilated_vcd_sc.h"
 
 sc_time vcdstart(0,SC_NS);
-sc_time vcdend(300000,SC_NS);
+sc_time vcdend(1000000,SC_NS);
 
 int tfpv=0;
 VerilatedVcdSc * tfp;
@@ -37,20 +37,21 @@ sc_signal <uint32_t > dst_data;
 sc_signal <bool>      dst_last;
 sc_signal <bool>      dst_ready;
 
-sc_signal <uint32_t > vss;
-sc_signal <uint32_t > vid;
-sc_signal <uint32_t > vis;
-sc_signal <uint32_t > vih;
-sc_signal <uint32_t > viw;
-sc_signal <uint32_t > vds;
-sc_signal <uint32_t > vod;
-sc_signal <uint32_t > vos;
-sc_signal <uint32_t > voh;
-sc_signal <uint32_t > vow;
-sc_signal <uint32_t > vfs;
-sc_signal <uint32_t > vks;
-sc_signal <uint32_t > vkh;
-sc_signal <uint32_t > vkw;
+sc_signal <sc_bv<12> > vss;
+sc_signal <sc_bv<4> >  vid;
+sc_signal <sc_bv<10> > vis;
+sc_signal <sc_bv<5> >  vih;
+sc_signal <sc_bv<5> >  viw;
+sc_signal <sc_bv<12> > vds;
+sc_signal <sc_bv<4> >  vod;
+sc_signal <sc_bv<10> > vos;
+sc_signal <sc_bv<5> >  voh;
+sc_signal <sc_bv<5> >  vow;
+sc_signal <sc_bv<10> > vfs;
+sc_signal <sc_bv<10> > vks;
+sc_signal <sc_bv<5> >  vkh;
+sc_signal <sc_bv<5> >  vkw;
+
 // verilator
 
 void eval()
@@ -130,8 +131,8 @@ static void train_net(const std::string &data_dir_path,
   train_images.resize(1600);
   //train_labels.resize(20000);
   //train_images.resize(20000);
-  //train_labels.resize(32);
-  //train_images.resize(32);
+  //train_labels.resize(16);
+  //train_images.resize(16);
 
   std::cout << "start training" << std::endl;
 
@@ -235,36 +236,64 @@ int sc_main(int argc, char **argv) {
   sc_clock clk ("clk", 10, SC_NS);
 
   sc_signal <bool>         s_init;
+  sc_signal <bool>         s_fin;
   sc_signal <bool>         k_init;
-  sc_signal <bool>         exec;
   sc_signal <bool>         k_fin;
-  sc_signal <bool>         o_fin;
-  sc_signal <sc_bv<4> >    outc;
+  sc_signal <bool>         exec;
   sc_signal <sc_bv<13> >   ia;
-  sc_signal <sc_bv<10> >   wa;
+  sc_signal <bool>         outr;
   sc_signal <sc_bv<13> >   oa;
+  sc_signal <sc_bv<4> >    kn;
+  sc_signal <sc_bv<10> >   wa;
+  sc_signal <sc_bv<4> >    ra;
+  sc_signal <sc_bv<10> >   prm_a;
 
   tiny_dnn_sc_ctl U_tiny_dnn_sc_ctl("U_tiny_dnn_sc_ctl");
   U_tiny_dnn_sc_ctl.clk(clk);
+  U_tiny_dnn_sc_ctl.run(run);
+  U_tiny_dnn_sc_ctl.wwrite(wwrite);
+  U_tiny_dnn_sc_ctl.bwrite(bwrite);
   U_tiny_dnn_sc_ctl.s_init(s_init);
+  U_tiny_dnn_sc_ctl.s_fin(s_fin);
   U_tiny_dnn_sc_ctl.k_init(k_init);
-  U_tiny_dnn_sc_ctl.ia(ia);
-  U_tiny_dnn_sc_ctl.wa(wa);
-  U_tiny_dnn_sc_ctl.oa(oa);
-  U_tiny_dnn_sc_ctl.exec(exec);
   U_tiny_dnn_sc_ctl.k_fin(k_fin);
-  U_tiny_dnn_sc_ctl.o_fin(o_fin);
-  U_tiny_dnn_sc_ctl.outc(outc);
+  U_tiny_dnn_sc_ctl.exec(exec);
+  U_tiny_dnn_sc_ctl.ia(ia);
+  U_tiny_dnn_sc_ctl.outr(outr);
+  U_tiny_dnn_sc_ctl.oa(oa);
+  U_tiny_dnn_sc_ctl.kn(kn);
+  U_tiny_dnn_sc_ctl.wa(wa);
+  U_tiny_dnn_sc_ctl.ra(ra);
+  U_tiny_dnn_sc_ctl.prm_a(prm_a);
+
+  U_tiny_dnn_sc_ctl.src_valid(src_valid);
+  U_tiny_dnn_sc_ctl.src_ready(src_ready);
+
+  U_tiny_dnn_sc_ctl.id(vid);
+  U_tiny_dnn_sc_ctl.is(vis);
+  U_tiny_dnn_sc_ctl.ih(vih);
+  U_tiny_dnn_sc_ctl.iw(viw);
+  U_tiny_dnn_sc_ctl.od(vod);
+  U_tiny_dnn_sc_ctl.os(vos);
+  U_tiny_dnn_sc_ctl.oh(voh);
+  U_tiny_dnn_sc_ctl.ow(vow);
+  U_tiny_dnn_sc_ctl.fs(vfs);
+  U_tiny_dnn_sc_ctl.ks(vks);
+  U_tiny_dnn_sc_ctl.kh(vkh);
+  U_tiny_dnn_sc_ctl.kw(vkw);
 
   verilator_top.s_init(s_init);
-  verilator_top.sc_k_init(k_init);
-  verilator_top.sc_exec(exec);
-  verilator_top.sc_k_fin(k_fin);
-  verilator_top.sc_o_fin(o_fin);
-  verilator_top.sc_outc(outc);
-  verilator_top.sc_ia(ia);
-  verilator_top.sc_wa(wa);
-  verilator_top.sc_oa(oa);
+  verilator_top.s_fin(s_fin);
+  verilator_top.k_init(k_init);
+  verilator_top.k_fin(k_fin);
+  verilator_top.exec(exec);
+  verilator_top.ia(ia);
+  verilator_top.outr(outr);
+  verilator_top.oa(oa);
+  verilator_top.kn(kn);
+  verilator_top.wa(wa);
+  verilator_top.ra(ra);
+  verilator_top.prm_a(prm_a);
 
   verilator_top.clk(clk);
   verilator_top.backprop(backprop);

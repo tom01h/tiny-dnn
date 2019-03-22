@@ -24,20 +24,20 @@ extern sc_signal <uint32_t > dst_data;
 extern sc_signal <bool>      dst_last;
 extern sc_signal <bool>      dst_ready;
 
-extern sc_signal <uint32_t > vss;
-extern sc_signal <uint32_t > vid;
-extern sc_signal <uint32_t > vis;
-extern sc_signal <uint32_t > vih;
-extern sc_signal <uint32_t > viw;
-extern sc_signal <uint32_t > vds;
-extern sc_signal <uint32_t > vod;
-extern sc_signal <uint32_t > vos;
-extern sc_signal <uint32_t > voh;
-extern sc_signal <uint32_t > vow;
-extern sc_signal <uint32_t > vfs;
-extern sc_signal <uint32_t > vks;
-extern sc_signal <uint32_t > vkh;
-extern sc_signal <uint32_t > vkw;
+extern sc_signal <sc_bv<12> > vss;
+extern sc_signal <sc_bv<4> >  vid;
+extern sc_signal <sc_bv<10> > vis;
+extern sc_signal <sc_bv<5> >  vih;
+extern sc_signal <sc_bv<5> >  viw;
+extern sc_signal <sc_bv<12> > vds;
+extern sc_signal <sc_bv<4> >  vod;
+extern sc_signal <sc_bv<10> > vos;
+extern sc_signal <sc_bv<5> >  voh;
+extern sc_signal <sc_bv<5> >  vow;
+extern sc_signal <sc_bv<10> > vfs;
+extern sc_signal <sc_bv<10> > vks;
+extern sc_signal <sc_bv<5> >  vkh;
+extern sc_signal <sc_bv<5> >  vkw;
 
 extern void eval();
 
