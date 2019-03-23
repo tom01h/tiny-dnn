@@ -250,6 +250,7 @@ int sc_main(int argc, char **argv) {
 
   tiny_dnn_sc_ctl U_tiny_dnn_sc_ctl("U_tiny_dnn_sc_ctl");
   U_tiny_dnn_sc_ctl.clk(clk);
+  U_tiny_dnn_sc_ctl.backprop(backprop);
   U_tiny_dnn_sc_ctl.run(run);
   U_tiny_dnn_sc_ctl.wwrite(wwrite);
   U_tiny_dnn_sc_ctl.bwrite(bwrite);

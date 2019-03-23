@@ -11,12 +11,21 @@ void tiny_dnn_sc_ctl::writet()
   while(true){
     wait();
     if(wwrite.read() || bwrite.read()){
-      for(int oc=0; oc<=od.read().to_uint(); oc++){
-        kn.write(oc);
-        int fsl=(bwrite.read()) ? 0 : fs.read().to_uint();
-        for(int fs=0; fs<=fsl; fs++){
-          prm_a.write(fs);
-          wait();
+      int icl=(backprop.read()) ? id.read().to_uint() : 0;
+      for(int ic=0; ic<=icl; ic++){
+        for(int oc=0; oc<=od.read().to_uint(); oc++){
+          kn.write(oc);
+          int ksi=ks.read().to_uint();
+          int fsl=(backprop.read()) ? ks.read().to_uint() :
+            ((bwrite.read()) ? 0 : fs.read().to_uint()); // forward
+          for(int fs=0; fs<=fsl; fs++){
+            if(backprop.read()){
+              prm_a.write(ic*(ksi+1) + ksi - fs);
+            }else{
+              prm_a.write(fs);
+            }
+            wait();
+          }
         }
       }
       while(wwrite.read() || bwrite.read()){
@@ -40,28 +49,36 @@ void tiny_dnn_sc_ctl::exect()
 
   wait();
 
-  int i=0;
-  int w=0;
-
   while(true){
     wait();
     if(s_init.read()){
       for(int iy=0; iy<=oh.read().to_uint(); iy++){
+        int yy = (backprop.read()) ? iy-kh.read().to_uint() : iy;
         for(int ix=0; ix<=ow.read().to_uint(); ix++){
+          int xx = (backprop.read()) ? ix-kw.read().to_uint() : ix;
           k_init.write(1);
           wait();
           k_init.write(0);
-          w=0;
           for(int ic=0; ic<=id.read().to_uint(); ic++){
             for(int fy=0; fy<=kh.read().to_uint(); fy++){
+              if(backprop.read()){
+                if((yy+fy)<0){fy=-yy;}
+                if((yy+fy)==(ih.read().to_uint()+1)){break;}
+              }
               for(int fx=0; fx<=kw.read().to_uint(); fx++){
-                i=ic*is.read().to_uint()+
-                  (iy+fy)*(iw.read().to_uint()+1)+(ix+fx);
+                if(backprop.read()){
+                  if((xx+fx)<0){fx=-xx;}
+                  if((xx+fx)==(iw.read().to_uint()+1)){break;}
+                }
+                int i=ic*is.read().to_uint()+
+                  (yy+fy)*(iw.read().to_uint()+1)+(xx+fx);
+                int w = ic*(ks.read().to_uint()+1)+
+                  fy*(kw.read().to_uint()+1)+fx;
+
                 ia.write(i);
                 wa.write(w);
                 exec.write(1);
                 wait();
-                w++;
               }
             }
           }

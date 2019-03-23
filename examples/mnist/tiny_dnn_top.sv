@@ -60,6 +60,18 @@ module tiny_dnn_top
    wire [15:0]        d;
    wire [31:0]        x;
 
+   wire               s_fini;
+   wire               k_initi;
+   wire               k_fini;
+   wire               execi;
+   wire [12:0]        iai;
+   wire               outri;
+   wire [12:0]        oai;
+   wire [3:0]         kni;
+   wire [9:0]         wai;
+   wire [3:0]         rai;
+   wire [9:0]         prm_ai = wai;
+
    batch_ctrl batch_ctrl
      (
       .clk(clk),
@@ -100,7 +112,7 @@ module tiny_dnn_top
       .oa(oa[11:0]),
       .x(x)
       );
-/*
+
    sample_ctrl sample_ctrl
      (
       .clk(clk),
@@ -111,16 +123,16 @@ module tiny_dnn_top
       .wwrite(wwrite),
       .bwrite(bwrite),
       .s_init(s_init),
-      .s_fin(),
-      .k_init(),
-      .k_fin(),
-      .exec(),
-      .ia(),
-      .outr(),
-      .oa(),
-      .kn(),
-      .wa(),
-      .ra(),
+      .s_fin(s_fini),
+      .k_init(k_initi),
+      .k_fin(k_fini),
+      .exec(execi),
+      .ia(iai),
+      .outr(outri),
+      .oa(oai),
+      .kn(kni),
+      .wa(wai),
+      .ra(rai),
       .id(id[3:0]),
       .is(is[9:0]),
       .ih(ih[4:0]),
@@ -134,7 +146,7 @@ module tiny_dnn_top
       .kh(kh[4:0]),
       .kw(kw[4:0])
       );
-*/
+
    wire               signo [0:15];
    wire signed [9:0]  expo [0:15];
    wire signed [31:0] addo [0:15];

@@ -64,7 +64,7 @@ module batch_ctrl
       end
    end
 endmodule
-/*
+
 module sample_ctrl
   (
    input wire        clk,
@@ -299,4 +299,3 @@ module sample_ctrl
    end
 
 endmodule
-*/

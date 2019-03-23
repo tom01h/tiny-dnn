@@ -4,6 +4,7 @@ SC_MODULE(tiny_dnn_sc_ctl)
 {
   //Ports
   sc_in  <bool>         clk;
+  sc_in  <bool>         backprop;
   sc_in  <bool>         run;
   sc_in  <bool>         wwrite;
   sc_in  <bool>         bwrite;
