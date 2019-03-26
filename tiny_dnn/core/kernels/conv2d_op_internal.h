@@ -24,6 +24,7 @@ extern sc_signal <uint32_t > dst_data;
 extern sc_signal <bool>      dst_last;
 extern sc_signal <bool>      dst_ready;
 
+extern sc_signal <sc_bv<4> >  vdd;
 extern sc_signal <sc_bv<12> > vss;
 extern sc_signal <sc_bv<4> >  vid;
 extern sc_signal <sc_bv<10> > vis;
@@ -84,6 +85,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   // params.h_stride
   if(in_data.size()>1){
     //if(0){
+    vdd = 0;
     vss = iw*ih*id-1;
     vid = id-1;
     vis = iw*ih;
@@ -246,6 +248,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
   size_t kw          = params.weight.width_;
   size_t kh          = params.weight.height_;
 
+  vdd = 0;
   vss = ow*oh*od-1;
   vid = od-1;
   vis = ow*oh;
@@ -260,7 +263,6 @@ void conv2d_op_internal(const tensor_t &prev_out,
   vks = kw*kh-1;
   vkh = kh-1;
   vkw = kw-1;
-
 
   backprop = 1;
   enbias = 0;
@@ -346,38 +348,38 @@ void conv2d_op_internal(const tensor_t &prev_out,
       }
     }
   }
-  /*  verilator_top->backprop = 0;
-  verilator_top->src_valid = 0;
-  verilator_top->run = 0;
+  backprop = 0;
+  src_valid = 0;
+  run = 0;
+
+  vdd = id-1;
+  vss = iw*ih*id-1;
+  vid = 0;
+  vis = iw*ih;
+  vih = ih-1;
+  viw = iw-1;
+
+  vds = kw*kh*id*od-1;
+  vod = od-1;
+  vos = kw*kh*id;
+  voh = kh-1;
+  vow = kw-1;
+
+  vfs = ow*oh-1;
+  vks = ow*oh-1;
+  vkh = oh-1;
+  vkw = ow-1;
 
 
-  verilator_top->ss = iw*ih*id-1;
-  verilator_top->id = 0;
-  verilator_top->is = iw*ih;
-  verilator_top->ih = ih-1;
-  verilator_top->iw = iw-1;
-
-  verilator_top->ds = kw*kh*id*od-1;
-  verilator_top->od = od-1;
-  verilator_top->os = kw*kh*id;
-  verilator_top->oh = kh-1;
-  verilator_top->ow = kw-1;
-
-  verilator_top->fs = ow*oh-1;
-  verilator_top->ks = ow*oh-1;
-  verilator_top->kh = oh-1;
-  verilator_top->kw = ow-1;
-
-
-  verilator_top->backprop = 0;
-  verilator_top->enbias = 0;
-  verilator_top->wwrite = 0;
-  verilator_top->bwrite = 0;
-  verilator_top->run = 0;
-  verilator_top->src_valid = 0;
-  verilator_top->dst_ready = 1;
+  backprop = 0;
+  enbias = 0;
+  wwrite = 0;
+  bwrite = 0;
+  run = 0;
+  src_valid = 0;
+  dst_ready = 1;
   eval();
-  */
+
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
     // accumulate dw
 
@@ -386,45 +388,45 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     const vec_t &delta = curr_delta[sample];
     const vec_t &prevo = prev_out[sample];
-    /*
-    verilator_top->wwrite = 1;
+
+    wwrite = 1;
     eval();
-    verilator_top->src_valid = 1;
+    src_valid = 1;
     for(size_t i=0;i<ow*oh*od;i++){
       conv.f = delta[i];
-      verilator_top->src_data = conv.ui;
+      src_data = conv.ui;
       eval();
     }
-    verilator_top->src_valid = 0;
+    src_valid = 0;
     eval();
-    verilator_top->wwrite = 0;
+    wwrite = 0;
     eval();
 
-    verilator_top->run = 1;
+    run = 1;
     eval();
-    verilator_top->src_valid = 1;
+    src_valid = 1;
 
-    while(!verilator_top->dst_valid) {
-      if(verilator_top->src_ready){
+    while(!dst_valid) {
+      if(src_ready){
         conv.f = prevo[ina++];
-        verilator_top->src_data = conv.ui;
+        src_data = conv.ui;
       }
       eval();
     }
 
-    while(verilator_top->dst_valid){
-      conv.ui = verilator_top->dst_data;
+    while(dst_valid){
+      conv.ui = dst_data;
       dW[sample][outa++] = conv.f;
       eval();
     }
 
-    verilator_top->src_valid = 0;
+    src_valid = 0;
     eval();
-    verilator_top->run = 0;
+    run = 0;
     eval();
-    */
-    //    if(0){
-    if(1){
+
+    if(0){
+      //if(1){
       for (size_t outc = 0; outc < od; outc++) {
         for (size_t inc = 0; inc < id; inc++) {
 

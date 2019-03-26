@@ -37,6 +37,7 @@ sc_signal <uint32_t > dst_data;
 sc_signal <bool>      dst_last;
 sc_signal <bool>      dst_ready;
 
+sc_signal <sc_bv<4> >  vdd;
 sc_signal <sc_bv<12> > vss;
 sc_signal <sc_bv<4> >  vid;
 sc_signal <sc_bv<10> > vis;
@@ -270,6 +271,7 @@ int sc_main(int argc, char **argv) {
   U_tiny_dnn_sc_ctl.src_valid(src_valid);
   U_tiny_dnn_sc_ctl.src_ready(src_ready);
 
+  U_tiny_dnn_sc_ctl.dd(vdd);
   U_tiny_dnn_sc_ctl.id(vid);
   U_tiny_dnn_sc_ctl.is(vis);
   U_tiny_dnn_sc_ctl.ih(vih);

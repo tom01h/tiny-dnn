@@ -24,6 +24,7 @@ SC_MODULE(tiny_dnn_sc_ctl)
   sc_in <bool>          src_valid;
   sc_in <bool>          src_ready;
 
+  sc_in <sc_bv<4> >     dd;
   sc_in <sc_bv<4> >     id;
   sc_in <sc_bv<10> >    is;
   sc_in <sc_bv<5> >     ih;
