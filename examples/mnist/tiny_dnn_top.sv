@@ -8,6 +8,19 @@ module tiny_dnn_top
    input wire        wwrite,
    input wire        bwrite,
 
+   output wire       sc_s_init,
+   input wire        sc_s_fin,
+   input wire        sc_k_init,
+   input wire        sc_k_fin,
+   input wire        sc_exec,
+   input wire [12:0] sc_ia,
+   input wire        sc_outr,
+   input wire [12:0] sc_oa,
+   input wire [3:0]  sc_kn,
+   input wire [9:0]  sc_wa,
+   input wire [3:0]  sc_ra,
+   input wire [9:0]  sc_prm_a,
+
    input wire        src_valid,
    input real        src_data,
    input wire        src_last,
@@ -46,6 +59,7 @@ module tiny_dnn_top
    wire [3:0]         kn;
    wire [9:0]         wa;
    wire [3:0]         ra;
+   wire [9:0]         prm_a;
 
    // sample control -> core, src buffer
    wire               exec;
@@ -70,7 +84,20 @@ module tiny_dnn_top
       x <= sum[ra];
    end
 
-
+/**/
+   assign sc_s_init = s_init;
+   assign s_fin = sc_s_fin;
+   assign k_init = sc_k_init;
+   assign k_fin = sc_k_fin;
+   assign exec = sc_exec;
+   assign ia = sc_ia;
+   assign outr = sc_outr;
+   assign oa = sc_oa;
+   assign kn = sc_kn;
+   assign wa = sc_wa;
+   assign ra = sc_ra;
+   assign prm_a = sc_prm_a;
+/**/
    batch_ctrl batch_ctrl
      (
       .clk(clk),
@@ -111,7 +138,7 @@ module tiny_dnn_top
       .oa(oa[11:0]),
       .x(x)
       );
-
+/*
    sample_ctrl sample_ctrl
      (
       .clk(clk),
@@ -131,6 +158,7 @@ module tiny_dnn_top
       .oa(oa[11:0]),
       .kn(kn[3:0]),
       .wa(wa[9:0]),
+//      .prm_a(prm_a[9:0]),
       .ra(ra[3:0]),
       .id(id[3:0]),
       .is(is[9:0]),
@@ -144,7 +172,8 @@ module tiny_dnn_top
       .ks(ks[9:0]),
       .kh(kh[4:0]),
       .kw(kw[4:0])
-   );
+      );
+/**/
 
    generate
       genvar i;
@@ -157,7 +186,8 @@ module tiny_dnn_top
                 .bwrite(bwrite),
                 .exec(exec),
                 .bias(k_fin&enbias),
-                .a(wa[9:0]),
+                .ra(wa[9:0]),
+                .wa(prm_a[9:0]),
                 .d(d),
                 .wd(src_data),
                 .sum(sum[i])

@@ -6,7 +6,8 @@ module tiny_dnn_core
    input wire       bwrite,
    input wire       exec,
    input wire       bias,
-   input wire [9:0] a,
+   input wire [9:0] ra,
+   input wire [9:0] wa,
    input real       d,
    input real       wd,
    output real      sum
@@ -18,14 +19,15 @@ module tiny_dnn_core
    real          w;
    reg           exec1,bias1;
 
-   wire [9:0]    adr = (bwrite|bias) ? f_size-1 : a ;
+   wire [9:0]    radr = (bias)   ? f_size-1 : ra ;
+   wire [9:0]    wadr = (bwrite) ? f_size-1 : wa ;
 
    always_ff @(posedge clk)begin
       if(write)begin
-         W[adr] <= wd;
+         W[wadr] <= wd;
       end
       if(exec|bias)begin
-         w <= W[adr];
+         w <= W[radr];
       end
       exec1 <= exec;
       bias1 <= bias;

@@ -34,8 +34,8 @@ module dst_buf
 
    real              buff [0:4095];
 
-   reg                outrl;
-   reg [11:0]         oal;
+   reg               outrl;
+   reg [11:0]        oal;
 
    always_ff @(posedge clk)begin
       if(outr)begin
