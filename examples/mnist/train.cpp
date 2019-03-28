@@ -7,19 +7,15 @@
 */
 
 // verilator
-#include "systemc.h"
-#include "tiny_dnn_sc_ctl.h"
 #include "unistd.h"
 #include "getopt.h"
-#include "Vtiny_dnn_top.h"
+#include "systemc.h"
 #include "verilated.h"
-#include "verilated_vcd_sc.h"
+#include "verilated_vcd_c.h"
+#include "tiny_dnn_sc_ctl.h"
+#include "Vtiny_dnn_top.h"
 
-sc_time vcdstart(0,SC_NS);
-sc_time vcdend(1000000,SC_NS);
-
-int tfpv=0;
-VerilatedVcdSc * tfp;
+sc_clock clk ("clk", 10, SC_NS);
 
 sc_signal <bool>      backprop;
 sc_signal <bool>      enbias;
@@ -27,23 +23,14 @@ sc_signal <bool>      run;
 sc_signal <bool>      wwrite;
 sc_signal <bool>      bwrite;
 
-sc_signal <bool>      src_valid;
-sc_signal <uint32_t > src_data;
-sc_signal <bool>      src_last;
-sc_signal <bool>      src_ready;
-
-sc_signal <bool>      dst_valid;
-sc_signal <uint32_t > dst_data;
-sc_signal <bool>      dst_last;
-sc_signal <bool>      dst_ready;
+sc_signal <sc_bv<12> > vss;
+sc_signal <sc_bv<12> > vds;
 
 sc_signal <sc_bv<4> >  vdd;
-sc_signal <sc_bv<12> > vss;
 sc_signal <sc_bv<4> >  vid;
 sc_signal <sc_bv<10> > vis;
 sc_signal <sc_bv<5> >  vih;
 sc_signal <sc_bv<5> >  viw;
-sc_signal <sc_bv<12> > vds;
 sc_signal <sc_bv<4> >  vod;
 sc_signal <sc_bv<10> > vos;
 sc_signal <sc_bv<5> >  voh;
@@ -53,23 +40,63 @@ sc_signal <sc_bv<10> > vks;
 sc_signal <sc_bv<5> >  vkh;
 sc_signal <sc_bv<5> >  vkw;
 
+sc_signal <bool>         s_init;
+sc_signal <bool>         s_fin;
+sc_signal <bool>         k_init;
+sc_signal <bool>         k_fin;
+sc_signal <bool>         exec;
+sc_signal <sc_bv<13> >   ia;
+sc_signal <bool>         outr;
+sc_signal <sc_bv<13> >   oa;
+sc_signal <sc_bv<4> >    kn;
+sc_signal <sc_bv<10> >   wa;
+sc_signal <sc_bv<4> >    ra;
+sc_signal <sc_bv<10> >   prm_a;
+
+vluint64_t main_time = 0;
+vluint64_t vcdstart = 0;
+vluint64_t vcdend = vcdstart + 300000;
+
+VerilatedVcdC* tfp;
+Vtiny_dnn_top* verilator_top;
 // verilator
 
 void eval()
 {
-  if((tfpv==0)&(sc_time_stamp()>=vcdstart)){
-    tfpv=1;
-    tfp->open("tmp.vcd");
-  }
+  // negedge clk /////////////////////////////
+  verilator_top->clk = !clk;
 
-  sc_start(10, SC_NS);
+  verilator_top->eval();
+  sc_start(5, SC_NS);
 
-  if(tfpv==1){
-    if(sc_time_stamp()>vcdend){
-      tfp->close();
-      tfpv=2;
-    }
-  }
+  if((main_time>=vcdstart)&((main_time<vcdend)|(vcdend==0)))
+    tfp->dump(main_time);
+  main_time += 5;
+
+  // posegedge clk /////////////////////////////
+  verilator_top->clk = !clk;
+
+  verilator_top->eval();
+  sc_start(5, SC_NS);
+  //          verilog -> SystemC
+  s_init = verilator_top->sc_s_init;
+  //          SystemC -> verilog
+
+  verilator_top->sc_s_fin = s_fin;
+  verilator_top->sc_k_init = k_init;
+  verilator_top->sc_k_fin = k_fin;
+  verilator_top->sc_exec = exec;
+  verilator_top->sc_ia = ia.read().to_uint();
+  verilator_top->sc_outr = outr;
+  verilator_top->sc_oa = oa.read().to_uint();
+  verilator_top->sc_kn = kn.read().to_uint();
+  verilator_top->sc_wa = wa.read().to_uint();
+  verilator_top->sc_ra = ra.read().to_uint();
+  verilator_top->sc_prm_a = prm_a.read().to_uint();
+
+  if((main_time>=vcdstart)&((main_time<vcdend)|(vcdend==0)))
+    tfp->dump(main_time);
+  main_time += 5;
 
   return;
 }
@@ -132,8 +159,8 @@ static void train_net(const std::string &data_dir_path,
   train_images.resize(1600);
   //train_labels.resize(20000);
   //train_images.resize(20000);
-  //train_labels.resize(16);
-  //train_images.resize(16);
+  //train_labels.resize(32);
+  //train_images.resize(32);
 
   std::cout << "start training" << std::endl;
 
@@ -227,27 +254,13 @@ int sc_main(int argc, char **argv) {
   }
 
 // verilator
-  Vtiny_dnn_top verilator_top("verilator_top");
   Verilated::commandArgs(argc, argv);
   Verilated::traceEverOn(true);
-  tfp = new VerilatedVcdSc;
-
-  verilator_top.trace(tfp, 99); // requires explicit max levels param
-
-  sc_clock clk ("clk", 10, SC_NS);
-
-  sc_signal <bool>         s_init;
-  sc_signal <bool>         s_fin;
-  sc_signal <bool>         k_init;
-  sc_signal <bool>         k_fin;
-  sc_signal <bool>         exec;
-  sc_signal <sc_bv<13> >   ia;
-  sc_signal <bool>         outr;
-  sc_signal <sc_bv<13> >   oa;
-  sc_signal <sc_bv<4> >    kn;
-  sc_signal <sc_bv<10> >   wa;
-  sc_signal <sc_bv<4> >    ra;
-  sc_signal <sc_bv<10> >   prm_a;
+  tfp = new VerilatedVcdC;
+  verilator_top = new Vtiny_dnn_top;
+  verilator_top->trace(tfp, 99); // requires explicit max levels param
+  tfp->open("tmp.vcd");
+  main_time = 0;
 
   tiny_dnn_sc_ctl U_tiny_dnn_sc_ctl("U_tiny_dnn_sc_ctl");
   U_tiny_dnn_sc_ctl.clk(clk);
@@ -268,9 +281,6 @@ int sc_main(int argc, char **argv) {
   U_tiny_dnn_sc_ctl.ra(ra);
   U_tiny_dnn_sc_ctl.prm_a(prm_a);
 
-  U_tiny_dnn_sc_ctl.src_valid(src_valid);
-  U_tiny_dnn_sc_ctl.src_ready(src_ready);
-
   U_tiny_dnn_sc_ctl.dd(vdd);
   U_tiny_dnn_sc_ctl.id(vid);
   U_tiny_dnn_sc_ctl.is(vis);
@@ -285,53 +295,10 @@ int sc_main(int argc, char **argv) {
   U_tiny_dnn_sc_ctl.kh(vkh);
   U_tiny_dnn_sc_ctl.kw(vkw);
 
-  verilator_top.s_init(s_init);
-  verilator_top.s_fin(s_fin);
-  verilator_top.k_init(k_init);
-  verilator_top.k_fin(k_fin);
-  verilator_top.exec(exec);
-  verilator_top.ia(ia);
-  verilator_top.outr(outr);
-  verilator_top.oa(oa);
-  verilator_top.kn(kn);
-  verilator_top.wa(wa);
-  verilator_top.ra(ra);
-  verilator_top.prm_a(prm_a);
-
-  verilator_top.clk(clk);
-  verilator_top.backprop(backprop);
-  verilator_top.enbias(enbias);
-  verilator_top.run(run);
-  verilator_top.wwrite(wwrite);
-  verilator_top.bwrite(bwrite);
-
-  verilator_top.src_valid(src_valid);
-  verilator_top.src_data(src_data);
-  verilator_top.src_last(src_last);
-  verilator_top.src_ready(src_ready);
-
-  verilator_top.dst_valid(dst_valid);
-  verilator_top.dst_data(dst_data);
-  verilator_top.dst_last(dst_last);
-  verilator_top.dst_ready(dst_ready);
-
-  verilator_top.ss(vss);
-  verilator_top.id(vid);
-  verilator_top.is(vis);
-  verilator_top.ih(vih);
-  verilator_top.iw(viw);
-  verilator_top.ds(vds);
-  verilator_top.od(vod);
-  verilator_top.os(vos);
-  verilator_top.oh(voh);
-  verilator_top.ow(vow);
-  verilator_top.fs(vfs);
-  verilator_top.ks(vks);
-  verilator_top.kh(vkh);
-  verilator_top.kw(vkw);
-
-  sc_start(SC_ZERO_TIME);
+  verilator_top->clk = 1;
+  verilator_top->eval();
   sc_start(5, SC_NS);
+  main_time += 5;
 // verilator
 
   if (data_path == "") {
@@ -370,5 +337,7 @@ int sc_main(int argc, char **argv) {
   } catch (tiny_dnn::nn_error &err) {
     std::cerr << "Exception: " << err.what() << std::endl;
   }
+  delete verilator_top;
+  tfp->close();
   return 0;
 }

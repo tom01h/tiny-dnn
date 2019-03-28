@@ -8,18 +8,18 @@ module tiny_dnn_top
    input wire         wwrite,
    input wire         bwrite,
 
-   output wire        s_init,
-   input wire         s_fin,
-   input wire         k_init,
-   input wire         k_fin,
-   input wire         exec,
-   input wire [12:0]  ia/*verilator sc_bv*/,
-   input wire         outr,
-   input wire [12:0]  oa/*verilator sc_bv*/,
-   input wire [3:0]   kn/*verilator sc_bv*/,
-   input wire [9:0]   wa/*verilator sc_bv*/,
-   input wire [3:0]   ra/*verilator sc_bv*/,
-   input wire [9:0]   prm_a/*verilator sc_bv*/,
+   output wire        sc_s_init,
+   input wire         sc_s_fin,
+   input wire         sc_k_init,
+   input wire         sc_k_fin,
+   input wire         sc_exec,
+   input wire [12:0]  sc_ia,
+   input wire         sc_outr,
+   input wire [12:0]  sc_oa,
+   input wire [3:0]   sc_kn,
+   input wire [9:0]   sc_wa,
+   input wire [3:0]   sc_ra,
+   input wire [9:0]   sc_prm_a,
 
    input wire         src_valid,
    input wire [31:0]  src_data,
@@ -31,23 +31,42 @@ module tiny_dnn_top
    output wire        dst_last,
    input wire         dst_ready,
 
-   input wire [11:0]  ss/*verilator sc_bv*/,
-   input wire [3:0]   id/*verilator sc_bv*/,
-   input wire [9:0]   is/*verilator sc_bv*/,
-   input wire [4:0]   ih/*verilator sc_bv*/,
-   input wire [4:0]   iw/*verilator sc_bv*/,
-   input wire [11:0]  ds/*verilator sc_bv*/,
-   input wire [3:0]   od/*verilator sc_bv*/,
-   input wire [9:0]   os/*verilator sc_bv*/,
-   input wire [4:0]   oh/*verilator sc_bv*/,
-   input wire [4:0]   ow/*verilator sc_bv*/,
-   input wire [9:0]   fs/*verilator sc_bv*/,
-   input wire [9:0]   ks/*verilator sc_bv*/,
-   input wire [4:0]   kh/*verilator sc_bv*/,
-   input wire [4:0]   kw/*verilator sc_bv*/
+   input wire [11:0]  ss,
+   input wire [3:0]   id,
+   input wire [9:0]   is,
+   input wire [4:0]   ih,
+   input wire [4:0]   iw,
+   input wire [11:0]  ds,
+   input wire [3:0]   od,
+   input wire [9:0]   os,
+   input wire [4:0]   oh,
+   input wire [4:0]   ow,
+   input wire [9:0]   fs,
+   input wire [9:0]   ks,
+   input wire [4:0]   kh,
+   input wire [4:0]   kw
    );
 
    parameter f_num  = 16;
+
+   //  batch control <-> sample control
+   wire               s_init;
+   wire               s_fin;
+
+   // sample control -> core
+   wire               k_init;
+   wire               k_fin;
+   wire [3:0]         kn;
+   wire [9:0]         wa;
+   wire [3:0]         ra;
+   wire [9:0]         prm_a;
+
+   // sample control -> core, src buffer
+   wire               exec;
+   wire [11:0]        ia;
+   // sample control -> core, dst buffer
+   wire               outr;
+   wire [11:0]        oa;
 
    // batch control -> src buffer
    wire               src_v;
@@ -59,19 +78,20 @@ module tiny_dnn_top
    // core <-> src,dst buffer
    wire [15:0]        d;
    wire [31:0]        x;
-
-   wire               s_fini;
-   wire               k_initi;
-   wire               k_fini;
-   wire               execi;
-   wire [12:0]        iai;
-   wire               outri;
-   wire [12:0]        oai;
-   wire [3:0]         kni;
-   wire [9:0]         wai;
-   wire [3:0]         rai;
-   wire [9:0]         prm_ai = wai;
-
+/**/
+   assign sc_s_init = s_init;
+   assign s_fin = sc_s_fin;
+   assign k_init = sc_k_init;
+   assign k_fin = sc_k_fin;
+   assign exec = sc_exec;
+   assign ia = sc_ia;
+   assign outr = sc_outr;
+   assign oa = sc_oa;
+   assign kn = sc_kn;
+   assign wa = sc_wa;
+   assign ra = sc_ra;
+   assign prm_a = sc_prm_a;
+/**/
    batch_ctrl batch_ctrl
      (
       .clk(clk),
@@ -112,7 +132,7 @@ module tiny_dnn_top
       .oa(oa[11:0]),
       .x(x)
       );
-
+/*
    sample_ctrl sample_ctrl
      (
       .clk(clk),
@@ -123,16 +143,17 @@ module tiny_dnn_top
       .wwrite(wwrite),
       .bwrite(bwrite),
       .s_init(s_init),
-      .s_fin(s_fini),
-      .k_init(k_initi),
-      .k_fin(k_fini),
-      .exec(execi),
-      .ia(iai),
-      .outr(outri),
-      .oa(oai),
-      .kn(kni),
-      .wa(wai),
-      .ra(rai),
+      .s_fin(s_fin),
+      .k_init(k_init),
+      .k_fin(k_fin),
+      .exec(exec),
+      .ia(ia[11:0]),
+      .outr(outr),
+      .oa(oa[11:0]),
+      .kn(kn[3:0]),
+      .wa(wa[9:0]),
+//      .prm_a(prm_a[9:0]),
+      .ra(ra[3:0]),
       .id(id[3:0]),
       .is(is[9:0]),
       .ih(ih[4:0]),
@@ -146,7 +167,7 @@ module tiny_dnn_top
       .kh(kh[4:0]),
       .kw(kw[4:0])
       );
-
+/**/
    wire               signo [0:15];
    wire signed [9:0]  expo [0:15];
    wire signed [31:0] addo [0:15];
@@ -175,8 +196,8 @@ module tiny_dnn_top
                 .bwrite(bwrite),
                 .exec(exec),
                 .bias(k_fin&enbias),
-                .wa(prm_a[9:0]),
                 .ra(wa[9:0]),
+                .wa(prm_a[9:0]),
                 .d(d),
                 .wd(src_data[31:16]),
                 .signo(signo[i]),
