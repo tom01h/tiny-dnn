@@ -1,16 +1,12 @@
 # tiny-dnn を FPGA で実行する
 
+tiny-dnn の畳み込みレイヤを Zynq の PL 部に作ったアクセラレータ回路にオフロードすることで、CNN の学習を加速します。  
+課題は ```examples/mnist``` を使用、サンプルの Le-Net を今時の単純な CNN に変更・軽量化して実験中です。
+
 オリジナルの [tiny-dnn のリポジトリ](https://github.com/tiny-dnn/tiny-dnn)
 
-課題は ```examples/mnist``` を軽量化して実験中です。
+## アクセラレータ実装中
 
-## アクセラレータ実装に向けて準備中
-まずは Verilator とコラボして、協調検証環境(全部手彫り)を構築中です。
-シーケンサを作りかけですが、```examples/mnist``` 以下で次のコマンドを打つと動きます。
+このブラランチは(master よりは多少)高速な RTL シミュレーション環境専用です。  
+実行方法は ```examples/mnist/readme.md``` の検証環境を参照してください。
 
-```
-$ make
-$ sim/Vtiny_dnn_top --data_path ../../data/ --learning_rate 1 --epochs 1 --minibatch_size 16 --backend_type internal
-```
-
-今回は課題が MNIST でネットが小さいので、最大 16並列で作っています。
