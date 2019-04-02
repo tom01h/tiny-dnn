@@ -9,17 +9,13 @@ module tiny_dnn_top
    input wire        bwrite,
 
    output wire       sc_s_init,
+   output wire       sc_out_busy,
    input wire        sc_s_fin,
    input wire        sc_k_init,
    input wire        sc_k_fin,
    input wire        sc_exec,
-   input wire [12:0] sc_ia,
-   input wire        sc_outr,
-   input wire [12:0] sc_oa,
-   input wire [3:0]  sc_kn,
+   input wire [11:0] sc_ia,
    input wire [9:0]  sc_wa,
-   input wire [3:0]  sc_ra,
-   input wire [9:0]  sc_prm_a,
 
    input wire        src_valid,
    input real        src_data,
@@ -49,25 +45,27 @@ module tiny_dnn_top
 
    parameter f_num  = 16;
 
-   //  batch control <-> sample control
+   // batch control <-> sample control
    wire               s_init;
    wire               s_fin;
+   wire               out_busy;
 
    // sample control -> core
    wire               k_init;
    wire               k_fin;
-   wire [3:0]         kn;
    wire [9:0]         wa;
-   wire [3:0]         ra;
-   wire [9:0]         prm_a;
 
    // sample control -> core, src buffer
    wire               exec;
    wire [11:0]        ia;
-   // sample control -> core, dst buffer
+   // out control -> core, dst buffer
    wire               outr;
+   wire [3:0]         ra;
    wire [11:0]        oa;
 
+   // batch control -> weight buffer
+   wire [3:0]         prm_v;
+   wire [9:0]         prm_a;
    // batch control -> src buffer
    wire               src_v;
    wire [11:0]        src_a;
@@ -86,35 +84,43 @@ module tiny_dnn_top
 
 /**/
    assign sc_s_init = s_init;
+   assign sc_out_busy = out_busy;
    assign s_fin = sc_s_fin;
    assign k_init = sc_k_init;
    assign k_fin = sc_k_fin;
    assign exec = sc_exec;
    assign ia = sc_ia;
-   assign outr = sc_outr;
-   assign oa = sc_oa;
-   assign kn = sc_kn;
    assign wa = sc_wa;
-   assign ra = sc_ra;
-   assign prm_a = sc_prm_a;
 /**/
    batch_ctrl batch_ctrl
      (
       .clk(clk),
       .s_init(s_init),
       .s_fin(s_fin),
+      .backprop(backprop),
       .run(run),
+      .wwrite(wwrite),
+      .bwrite(bwrite),
+
       .src_valid(src_valid),
       .src_last(src_last),
       .src_ready(src_ready),
-      .src_v(src_v),
-      .src_a(src_a[11:0]),
       .dst_valid(dst_valid),
       .dst_ready(dst_ready),
+
+      .prm_v(prm_v[3:0]),
+      .prm_a(prm_a[9:0]),
+      .src_v(src_v),
+      .src_a(src_a[11:0]),
       .dst_v(dst_v),
       .dst_a(dst_a[11:0]),
+
       .ss(ss[11:0]),
-      .ds(ds[11:0])
+      .ds(ds[11:0]),
+      .id(id[3:0]),
+      .od(od[3:0]),
+      .fs(fs[9:0]),
+      .ks(ks[9:0])
       );
 
    src_buf src_buf
@@ -138,41 +144,22 @@ module tiny_dnn_top
       .oa(oa[11:0]),
       .x(x)
       );
-/*
-   sample_ctrl sample_ctrl
+
+   out_ctrl out_ctrl
      (
       .clk(clk),
-      .src_valid(src_valid),
-      .src_ready(src_ready),
-      .backprop(backprop),
       .run(run),
-      .wwrite(wwrite),
-      .bwrite(bwrite),
       .s_init(s_init),
-      .s_fin(s_fin),
-      .k_init(k_init),
       .k_fin(k_fin),
-      .exec(exec),
-      .ia(ia[11:0]),
-      .outr(outr),
-      .oa(oa[11:0]),
-      .kn(kn[3:0]),
-      .wa(wa[9:0]),
-//      .prm_a(prm_a[9:0]),
-      .ra(ra[3:0]),
-      .id(id[3:0]),
-      .is(is[9:0]),
-      .ih(ih[4:0]),
-      .iw(iw[4:0]),
+      .out_busy(out_busy),
       .od(od[3:0]),
       .os(os[9:0]),
-      .oh(oh[4:0]),
-      .ow(ow[4:0]),
-      .fs(fs[9:0]),
-      .ks(ks[9:0]),
-      .kh(kh[4:0]),
-      .kw(kw[4:0])
+      .outr(outr),
+      .ra(ra[3:0]),
+      .oa(oa[11:0])
       );
+
+/**/
 /**/
 
    generate
@@ -182,7 +169,7 @@ module tiny_dnn_top
                (
                 .clk(clk),
                 .init(k_init),
-                .write((wwrite|bwrite)&(kn[3:0] == i) & src_valid & src_ready),
+                .write((wwrite|bwrite)&(prm_v[3:0] == i) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
                 .bias(k_fin&enbias),

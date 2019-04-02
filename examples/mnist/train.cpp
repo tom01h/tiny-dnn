@@ -23,35 +23,31 @@ sc_signal <bool>      run;
 sc_signal <bool>      wwrite;
 sc_signal <bool>      bwrite;
 
-sc_signal <sc_bv<12> > vss;
-sc_signal <sc_bv<12> > vds;
+sc_signal <sc_uint<12> > vss;
+sc_signal <sc_uint<12> > vds;
 
-sc_signal <sc_bv<4> >  vdd;
-sc_signal <sc_bv<4> >  vid;
-sc_signal <sc_bv<10> > vis;
-sc_signal <sc_bv<5> >  vih;
-sc_signal <sc_bv<5> >  viw;
-sc_signal <sc_bv<4> >  vod;
-sc_signal <sc_bv<10> > vos;
-sc_signal <sc_bv<5> >  voh;
-sc_signal <sc_bv<5> >  vow;
-sc_signal <sc_bv<10> > vfs;
-sc_signal <sc_bv<10> > vks;
-sc_signal <sc_bv<5> >  vkh;
-sc_signal <sc_bv<5> >  vkw;
+sc_signal <sc_uint<4> >  vdd;
+sc_signal <sc_uint<4> >  vid;
+sc_signal <sc_uint<10> > vis;
+sc_signal <sc_uint<5> >  vih;
+sc_signal <sc_uint<5> >  viw;
+sc_signal <sc_uint<4> >  vod;
+sc_signal <sc_uint<10> > vos;
+sc_signal <sc_uint<5> >  voh;
+sc_signal <sc_uint<5> >  vow;
+sc_signal <sc_uint<10> > vfs;
+sc_signal <sc_uint<10> > vks;
+sc_signal <sc_uint<5> >  vkh;
+sc_signal <sc_uint<5> >  vkw;
 
 sc_signal <bool>         s_init;
+sc_signal <bool>         out_busy;
 sc_signal <bool>         s_fin;
 sc_signal <bool>         k_init;
 sc_signal <bool>         k_fin;
 sc_signal <bool>         exec;
-sc_signal <sc_bv<13> >   ia;
-sc_signal <bool>         outr;
-sc_signal <sc_bv<13> >   oa;
-sc_signal <sc_bv<4> >    kn;
-sc_signal <sc_bv<10> >   wa;
-sc_signal <sc_bv<4> >    ra;
-sc_signal <sc_bv<10> >   prm_a;
+sc_signal <sc_uint<12> > ia;
+sc_signal <sc_uint<10> > wa;
 
 vluint64_t main_time = 0;
 vluint64_t vcdstart = 0;
@@ -80,19 +76,15 @@ void eval()
   sc_start(5, SC_NS);
   //          verilog -> SystemC
   s_init = verilator_top->sc_s_init;
+  out_busy = verilator_top->sc_out_busy;
   //          SystemC -> verilog
 
   verilator_top->sc_s_fin = s_fin;
   verilator_top->sc_k_init = k_init;
   verilator_top->sc_k_fin = k_fin;
   verilator_top->sc_exec = exec;
-  verilator_top->sc_ia = ia.read().to_uint();
-  verilator_top->sc_outr = outr;
-  verilator_top->sc_oa = oa.read().to_uint();
-  verilator_top->sc_kn = kn.read().to_uint();
-  verilator_top->sc_wa = wa.read().to_uint();
-  verilator_top->sc_ra = ra.read().to_uint();
-  verilator_top->sc_prm_a = prm_a.read().to_uint();
+  verilator_top->sc_ia = ia.read();
+  verilator_top->sc_wa = wa.read();
 
   if((main_time>=vcdstart)&((main_time<vcdend)|(vcdend==0)))
     tfp->dump(main_time);
@@ -269,17 +261,13 @@ int sc_main(int argc, char **argv) {
   U_tiny_dnn_sc_ctl.wwrite(wwrite);
   U_tiny_dnn_sc_ctl.bwrite(bwrite);
   U_tiny_dnn_sc_ctl.s_init(s_init);
+  U_tiny_dnn_sc_ctl.out_busy(out_busy);
   U_tiny_dnn_sc_ctl.s_fin(s_fin);
   U_tiny_dnn_sc_ctl.k_init(k_init);
   U_tiny_dnn_sc_ctl.k_fin(k_fin);
   U_tiny_dnn_sc_ctl.exec(exec);
   U_tiny_dnn_sc_ctl.ia(ia);
-  U_tiny_dnn_sc_ctl.outr(outr);
-  U_tiny_dnn_sc_ctl.oa(oa);
-  U_tiny_dnn_sc_ctl.kn(kn);
   U_tiny_dnn_sc_ctl.wa(wa);
-  U_tiny_dnn_sc_ctl.ra(ra);
-  U_tiny_dnn_sc_ctl.prm_a(prm_a);
 
   U_tiny_dnn_sc_ctl.dd(vdd);
   U_tiny_dnn_sc_ctl.id(vid);
