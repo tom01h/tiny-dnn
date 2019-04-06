@@ -54,4 +54,4 @@ $ ${SDK path}/gnu/aarch64/nt/aarch64-linux/bin/aarch64-linux-gnu-g++.exe -O3 -mt
   - 演算コア → IP 内バッファの転送
 - (済) udmabuf を使ってみる
 - ZynqMP で IOMMU(SMMU) を使ってみる
-- SystemC も使ってみる
+- ~~SystemC も使ってみる~~
