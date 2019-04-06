@@ -1,7 +1,5 @@
 # tyny-dnn アクセラレータ作成中
 
-SystemC を使った環境に移行中です。
-
 ## 概要
 
 畳み込みの行列乗算を 16MAC で並列に計算して学習を加速します。  
@@ -10,8 +8,6 @@ source buffer と destination buffer に 1サンプル分の入出力データ�
 ウェイト用のバッファは core 内に持ちます。  
 sample controller で 1サンプル内の制御をして、batch controller でミニバッチ 1層の制御をします。  
 im2col は on the fly で実行するので、転送データとバッファメモリを節約できます。
-
-sample control に見直しが必要なところが残っていますが…  
 
 ![](top.svg)
 
@@ -59,6 +55,10 @@ $ sim/Vtiny_dnn_top --data_path ../../data/ --learning_rate 1 --epochs 1 --minib
 FPGA で動かす時に PL にオフロードするところで Verilator のオブジェクト？に値を設定して、クロックと時間を進めて評価します。  
 PL にオフロードするところだけを RTL シミュレーションできるのでそこそこ高速です。  
 FPGA にもっていくときは、同じところを PL を操作するように書き換えます。
+
+配列インデックス生成部分は SystemC で書いて HLS しようと思っていたのですが、勝手に無駄サイクルを入れられて思った回路が出来ないので断念しました。  
+でもやはり SystemC だとかなり書きやすいので、まずは SystemC で書いて、見比べながら Verilog に翻訳していくのが良いような気がしています。  
+tiny_dnn_sc_ctl.cpp を人力で書き換えたのが tiny_dnn_ex_ctl.sv です。
 
 ## Zynq7 で動かすには
 

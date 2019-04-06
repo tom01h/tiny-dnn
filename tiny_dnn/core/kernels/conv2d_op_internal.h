@@ -16,34 +16,29 @@ extern sc_signal <bool>      run;
 extern sc_signal <bool>      wwrite;
 extern sc_signal <bool>      bwrite;
 
-extern sc_signal <sc_bv<4> >  vdd;
-extern sc_signal <sc_bv<12> > vss;
-extern sc_signal <sc_bv<4> >  vid;
-extern sc_signal <sc_bv<10> > vis;
-extern sc_signal <sc_bv<5> >  vih;
-extern sc_signal <sc_bv<5> >  viw;
-extern sc_signal <sc_bv<12> > vds;
-extern sc_signal <sc_bv<4> >  vod;
-extern sc_signal <sc_bv<10> > vos;
-extern sc_signal <sc_bv<5> >  voh;
-extern sc_signal <sc_bv<5> >  vow;
-extern sc_signal <sc_bv<10> > vfs;
-extern sc_signal <sc_bv<10> > vks;
-extern sc_signal <sc_bv<5> >  vkh;
-extern sc_signal <sc_bv<5> >  vkw;
+extern sc_signal <sc_uint<4> >  vdd;
+extern sc_signal <sc_uint<12> > vss;
+extern sc_signal <sc_uint<4> >  vid;
+extern sc_signal <sc_uint<10> > vis;
+extern sc_signal <sc_uint<5> >  vih;
+extern sc_signal <sc_uint<5> >  viw;
+extern sc_signal <sc_uint<12> > vds;
+extern sc_signal <sc_uint<4> >  vod;
+extern sc_signal <sc_uint<10> > vos;
+extern sc_signal <sc_uint<5> >  voh;
+extern sc_signal <sc_uint<5> >  vow;
+extern sc_signal <sc_uint<10> > vfs;
+extern sc_signal <sc_uint<10> > vks;
+extern sc_signal <sc_uint<5> >  vkh;
+extern sc_signal <sc_uint<5> >  vkw;
 
 extern sc_signal <bool>         s_init;
 extern sc_signal <bool>         s_fin;
 extern sc_signal <bool>         k_init;
 extern sc_signal <bool>         k_fin;
 extern sc_signal <bool>         exec;
-extern sc_signal <sc_bv<13> >   ia;
-extern sc_signal <bool>         outr;
-extern sc_signal <sc_bv<13> >   oa;
-extern sc_signal <sc_bv<4> >    kn;
-extern sc_signal <sc_bv<10> >   wa;
-extern sc_signal <sc_bv<4> >    ra;
-extern sc_signal <sc_bv<10> >   prm_a;
+extern sc_signal <sc_uint<12> > ia;
+extern sc_signal <sc_uint<10> > wa;
 
 extern void eval();
 
@@ -89,7 +84,8 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   // params.w_stride
   // params.h_stride
   if(in_data.size()>1){
-  //if(0){
+    //if(0){
+    verilator_top->dd = 0;
     verilator_top->ss = iw*ih*id-1;
     verilator_top->id = id-1;
     verilator_top->is = iw*ih;
@@ -282,6 +278,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
   size_t kw          = params.weight.width_;
   size_t kh          = params.weight.height_;
 
+  verilator_top->dd = 0;
   verilator_top->ss = ow*oh*od-1;
   verilator_top->id = od-1;
   verilator_top->is = ow*oh;
@@ -414,6 +411,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
   run = 0;
 
   verilator_top->ss = iw*ih*id-1;
+  verilator_top->dd = id-1;
   verilator_top->id = 0;
   verilator_top->is = iw*ih;
   verilator_top->ih = ih-1;
