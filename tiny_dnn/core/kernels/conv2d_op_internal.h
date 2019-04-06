@@ -84,7 +84,8 @@ inline void conv2d_op_internal(const tensor_t &in_data,
   // params.w_stride
   // params.h_stride
   if(in_data.size()>1){
-  //if(0){
+    //if(0){
+    verilator_top->dd = 0;
     verilator_top->ss = iw*ih*id-1;
     verilator_top->id = id-1;
     verilator_top->is = iw*ih;
@@ -277,6 +278,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
   size_t kw          = params.weight.width_;
   size_t kh          = params.weight.height_;
 
+  verilator_top->dd = 0;
   verilator_top->ss = ow*oh*od-1;
   verilator_top->id = od-1;
   verilator_top->is = ow*oh;
@@ -409,6 +411,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
   run = 0;
 
   verilator_top->ss = iw*ih*id-1;
+  verilator_top->dd = id-1;
   verilator_top->id = 0;
   verilator_top->is = iw*ih;
   verilator_top->ih = ih-1;

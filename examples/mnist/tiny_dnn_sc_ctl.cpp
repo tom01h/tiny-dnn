@@ -17,23 +17,33 @@ void tiny_dnn_sc_ctl::exect()
     if(s_init.read()){
       for(int dc=0; dc<=dd.read(); dc++){
         for(int iy=0; iy<=oh.read(); iy++){
-          int yy = (backprop.read()) ? iy-kh.read() : iy;
+          int yy, sy, ey;
+          if(backprop.read()){
+            yy = iy-kh.read();
+            sy = (yy<0) ? -yy : 0;
+            if(iy>ih.read()){ ey=ih.read()-yy; }else{ ey=kh.read(); }
+          }else{
+            yy=iy;
+            sy=0;
+            ey=kh.read();
+          }
           for(int ix=0; ix<=ow.read(); ix++){
-            int xx = (backprop.read()) ? ix-kw.read() : ix;
+            int xx, sx, ex;
+            if(backprop.read()){
+              xx = ix-kw.read();
+              sx = (xx<0) ? -xx : 0;
+              if(ix>iw.read()){ ex=iw.read()-xx; }else{ ex=kw.read(); }
+            }else{
+              xx=ix;
+              sx=0;
+              ex=kw.read();
+            }
             k_init.write(1);
             wait();
             k_init.write(0);
             for(int ic=0; ic<=id.read(); ic++){
-              for(int fy=0; fy<=kh.read(); fy++){
-                if(backprop.read()){
-                  if((yy+fy)<0){fy=-yy;}
-                  if((yy+fy)==(ih.read()+1)){break;}
-                }
-                for(int fx=0; fx<=kw.read(); fx++){
-                  if(backprop.read()){
-                    if((xx+fx)<0){fx=-xx;}
-                    if((xx+fx)==(iw.read()+1)){break;}
-                  }
+              for(int fy=sy; fy<=ey; fy++){
+                for(int fx=sx; fx<=ex; fx++){
                   int i=dc*is.read()+ic*is.read()+
                     (yy+fy)*(iw.read()+1)+(xx+fx);
                   int w = ic*(ks.read()+1)+

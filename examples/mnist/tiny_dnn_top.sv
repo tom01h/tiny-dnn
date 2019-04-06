@@ -28,6 +28,7 @@ module tiny_dnn_top
    input wire        dst_ready,
 
    input wire [11:0] ss,
+   input wire [3:0]  dd,
    input wire [3:0]  id,
    input wire [9:0]  is,
    input wire [4:0]  ih,
@@ -82,16 +83,6 @@ module tiny_dnn_top
       x <= sum[ra];
    end
 
-/**/
-   assign sc_s_init = s_init;
-   assign sc_out_busy = out_busy;
-   assign s_fin = sc_s_fin;
-   assign k_init = sc_k_init;
-   assign k_fin = sc_k_fin;
-   assign exec = sc_exec;
-   assign ia = sc_ia;
-   assign wa = sc_wa;
-/**/
    batch_ctrl batch_ctrl
      (
       .clk(clk),
@@ -159,8 +150,49 @@ module tiny_dnn_top
       .oa(oa[11:0])
       );
 
+/*
+   assign sc_s_init = s_init;
+   assign sc_out_busy = out_busy;
+   assign s_fin = sc_s_fin;
+   assign k_init = sc_k_init;
+   assign k_fin = sc_k_fin;
+   assign exec = sc_exec;
+   assign ia = sc_ia;
+   assign wa = sc_wa;
 /**/
+
+   tiny_dnn_ex_ctl tiny_dnn_ex_ctl
+     (
+      .clk(clk),
+      .backprop(backprop),
+      .run(run),
+      .wwrite(wwrite),
+      .bwrite(bwrite),
+      .s_init(s_init),
+      .out_busy(out_busy),
 /**/
+      .s_fin(s_fin),
+      .k_init(k_init),
+      .k_fin(k_fin),
+      .exec(exec),
+      .ia(ia),
+      .wa(wa),
+/**/
+      .dd(dd),
+      .id(id),
+      .is(is),
+      .ih(ih),
+      .iw(iw),
+      .od(od),
+      .os(os),
+      .oh(oh),
+      .ow(ow),
+      .fs(fs),
+      .ks(ks),
+      .kh(kh),
+      .kw(kw),
+      .rst(~run)
+);
 
    generate
       genvar i;

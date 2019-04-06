@@ -25,6 +25,8 @@ tiny_dnn_top.sv \
 tiny_dnn_control.sv \
 tiny_dnn_buf.sv \
 tiny_dnn_core.sv \
+tiny_dnn_ex_ctl.sv \
+loop_lib.sv \
 
 VERILATOR_CPP_TB = train.cpp tiny_dnn_sc_ctl.cpp
 
