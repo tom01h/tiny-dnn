@@ -77,6 +77,7 @@ module tiny_dnn_top
    // core <-> src,dst buffer
    wire [15:0]        d;
    wire [31:0]        x;
+
    batch_ctrl batch_ctrl
      (
       .clk(clk),
@@ -186,7 +187,8 @@ module tiny_dnn_top
       .kh(kh),
       .kw(kw),
       .rst(~run)
-);
+      );
+
    wire               signo [0:15];
    wire signed [9:0]  expo [0:15];
    wire signed [31:0] addo [0:15];

@@ -68,6 +68,8 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     dnn_addr[13] = oh-1;       //oh
     dnn_addr[14] = ow-1;       //ow
 
+    dnn_addr[15] = 0;          //dd
+
     dnn_addr[ 1] = kw*kh*id-1; //fs
     dnn_addr[ 2] = kw*kh-1;    //ks
     dnn_addr[ 3] = kh-1;       //kh
@@ -296,6 +298,8 @@ void conv2d_op_internal(const tensor_t &prev_out,
   dnn_addr[13] = ih-1;       //oh
   dnn_addr[14] = iw-1;       //ow
 
+  dnn_addr[15] = 0;          //dd
+
   dnn_addr[ 1] = kw*kh*od-1; //fs
   dnn_addr[ 2] = kw*kh-1;    //ks
   dnn_addr[ 3] = kh-1;       //kh
@@ -430,6 +434,8 @@ void conv2d_op_internal(const tensor_t &prev_out,
   dnn_addr[12] = kw*kh*id;   //os
   dnn_addr[13] = kh-1;       //oh
   dnn_addr[14] = kw-1;       //ow
+
+  dnn_addr[15] = id-1;       //dd
 
   dnn_addr[ 1] = ow*oh-1;    //fs
   dnn_addr[ 2] = ow*oh-1;    //ks
