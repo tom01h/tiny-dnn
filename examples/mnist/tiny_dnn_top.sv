@@ -139,7 +139,7 @@ module tiny_dnn_top
    out_ctrl out_ctrl
      (
       .clk(clk),
-      .run(run),
+      .rst(~run),
       .s_init(s_init),
       .k_fin(k_fin),
       .out_busy(out_busy),
