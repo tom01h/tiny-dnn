@@ -1,189 +1,156 @@
 module batch_ctrl
   (
-   input wire        clk,
-   output reg        s_init,
-   input wire        s_fin,
-   input wire        backprop,
-   input wire        run,
-   input wire        wwrite,
-   input wire        bwrite,
+   input wire         clk,
+   output reg         s_init,
+   input wire         s_fin,
+   input wire         backprop,
+   input wire         run,
+   input wire         wwrite,
+   input wire         bwrite,
 
-   input wire        src_valid,
-   input wire        src_last,
-   output reg        src_ready,
-   output reg        dst_valid,
-   input wire        dst_ready,
+   input wire         src_valid,
+   input wire         src_last,
+   output reg         src_ready,
+   output reg         dst_valid,
+   input wire         dst_ready,
 
-   output reg [3:0]  prm_v,
-   output reg [9:0]  prm_a,
-   output wire       src_v,
-   output reg [11:0] src_a,
-   output wire       dst_v,
-   output reg [11:0] dst_a,
+   output wire [3:0]  prm_v,
+   output wire [9:0]  prm_a,
+   output wire        src_v,
+   output reg [11:0]  src_a,
+   output wire        dst_v,
+   output wire [11:0] dst_a,
 
-   input wire [11:0] ss,
-   input wire [11:0] ds,
-   input wire [3:0]  id,
-   input wire [3:0]  od,
-   input wire [9:0]  fs,
-   input wire [9:0]  ks
+   input wire [11:0]  ss,
+   input wire [11:0]  ds,
+   input wire [3:0]   id,
+   input wire [3:0]   od,
+   input wire [9:0]   fs,
+   input wire [9:0]   ks
    );
 
-   reg               dst_vi;
-   assign dst_v = dst_vi & dst_ready;
+////////////////////// dst_v, dst_a /// dst_valid ///////////////
 
+   wire              last_da;
+   wire              next_da;
+   reg [11:0]        da;
+
+   wire              den = dst_ready;
+
+   wire              dstart, dstart0;
+   wire              dst_v0;
+   wire              dst_v0_in = s_fin|dst_v0&!last_da;
+
+   dff #(.W(1)) d_dstart0 (.in(s_fin), .data(dstart0), .clk(clk), .rst(~run), .en(den));
+   dff #(.W(1)) d_dst_v0 (.in(dst_v0_in), .data(dst_v0), .clk(clk), .rst(~run), .en(den));
+
+   assign dstart = den&dstart0;
+
+   loop1 #(.W(12)) l_da(.ini(12'd0), .fin(ds),  .data(da), .start(dstart),  .last(last_da),
+                        .clk(clk),   .rst(~run),            .next(next_da),   .en(den) );
+
+   assign dst_a = da;
+   assign dst_v = dst_v0 & dst_ready;
+   dff #(.W(1)) d_dst_valid (.in(dst_v0), .data(dst_valid), .clk(clk), .rst(~run), .en(den));
+
+////////////////////// src_v, src_a /// s_init, src_ready ///////
+
+   wire              last_sa;
+   wire              next_sa;
+   reg [11:0]        sa;
+
+   wire              sen = src_valid&src_ready;
+
+   wire              src_ready_n;
+   assign src_ready = !src_ready_n;
+
+   wire              sstart, sstart0, sstart0_in;
+
+   dff #(.W(1)) d_sstart0 (.in(run&!(dst_valid&!dst_v0)), .data(sstart0), .clk(clk), .rst(~run),
+                           .en(sen| (dst_valid&!dst_v0)) );
+
+   assign sstart = sen&run&!sstart0;
+
+   wire              src_ready_n_in = ~(src_ready&!last_sa | dst_valid&!dst_v0);
+   dff #(.W(1)) d_src_ready_n (.in(src_ready_n_in), .data(src_ready_n),
+                               .clk(clk), .rst(~run), .en(1'b1));
+
+   loop1 #(.W(12)) l_sa(.ini(12'd0), .fin(ss),  .data(sa), .start(sstart),  .last(last_sa),
+                        .clk(clk),   .rst(~src_ready|~run), .next(next_sa),   .en(sen) );
+   assign src_a = sa;
    assign src_v = run & src_valid & src_ready;
- 
-   always_ff @(posedge clk)begin
-      if(~run)begin
-         src_a <= 0;
-         s_init <= 1'b0;
-         src_ready <= 1'b1;
-      end else begin
-         if(~src_ready)begin
-            src_a <= 0;
-         end else if(src_valid & src_ready) begin
-            src_a <= src_a + 1;
-         end
-         if(src_a==ss)begin
-            s_init <= 1'b1;
-            src_ready <= 1'b0;
-         end else begin
-            s_init <= 1'b0;
-         end
-         if(dst_valid & ~dst_vi)begin
-            src_ready <= 1'b1;
-         end
-      end
-   end
+   dff #(.W(1)) d_s_init (.in(last_sa), .data(s_init), .clk(clk), .rst(~run), .en(1'b1));
 
-   always_ff @(posedge clk)begin
-      if(~run)begin
-         dst_vi <= 1'b0;
-         dst_a <= 0;
-      end else if(s_fin)begin
-         dst_vi <= 1'b1;
-         dst_a <= 0;
-      end else if(dst_a!=ds)begin
-         if(dst_vi&dst_ready)
-           dst_a <= dst_a + 1;
-      end else if(dst_ready)begin
-         dst_vi <= 1'b0;
-      end
-      if(dst_ready)begin
-         dst_valid <= dst_vi;
-      end
-   end
+////////////////////// prm_v, prm_a /////////////////////////////
 
-   reg [3:0]  inc;
-   reg [5:0]  wi;
+   wire              last_ic, last_oc, last_ki;
+   wire              next_ic, next_oc, next_ki;
+   reg [3:0]         ic     , oc;
+   reg [9:0]                           ki;
 
+   wire              wstart, wstart0, wstart1;
+   wire              wrst = ~(wwrite|bwrite);
+   wire              wen = src_valid;
 
-   wire       init = ~(wwrite|bwrite);
-   wire       bwrite_v = bwrite & src_valid & src_ready;
-   wire       wwrite_v = wwrite & src_valid & src_ready & ~backprop;
+   dff #(.W(1)) d_wstart0 (.in(wwrite|bwrite), .data(wstart0), .clk(clk), .rst(wrst), .en(1'b1));
+   dff #(.W(1)) d_wstart1 (.in(wstart0), .data(wstart1), .clk(clk), .rst(wrst), .en(wen));
 
-   wire       bwwrite_v = wwrite & src_valid & src_ready & backprop;
+   assign wstart = wen&wstart0&!wstart1;
 
-   always_ff @(posedge clk)begin
-      if(init)begin
-         inc <= 0;
-         prm_v <= 0;
-         if(backprop)begin
-            wi <= ks;
-            prm_a <= ks;
-         end else begin
-            wi <= 0;
-            prm_a <= 0;
-         end
-      end else if(bwrite_v | wwrite_v&(prm_a==fs))begin
-         prm_v <= prm_v + 1;
-         prm_a <= 0;
-      end else if(wwrite_v)begin
-         prm_a <= prm_a+1;
-         if(wi != ks)begin
-            wi <= wi +1;
-         end else if(inc != id)begin
-            wi <= 0;
-            inc <= inc +1;
-         end else begin
-            wi <= 0;
-            inc <= 0;
-         end
-      end else if(bwwrite_v)begin
-         prm_a <= prm_a-1;
-         if(wi != 0)begin
-            wi <= wi -1;
-         end else if(prm_v != od)begin
-            wi <= ks;
-            prm_v <= prm_v + 1;
-            prm_a <= prm_a+ks;
-         end else if(inc != id)begin
-            wi <= ks;
-            inc <= inc +1;
-            prm_v <= 0;
-            prm_a <= prm_a + ks*2 + 1;
-         end else begin
-            wi <= ks;
-            inc <= 0;
-         end
-      end
-   end
+   wire [3:0]        ice = (backprop) ? id : 0;
+
+   loop1 #(.W(4))  l_ic(.ini(4'd0),  .fin(ice), .data(ic), .start(wstart),  .last(last_ic),
+                        .clk(clk),   .rst(wrst),            .next(next_ic),   .en(last_oc&wen) );
+
+   loop1 #(.W(4) ) l_oc(.ini(4'd0),  .fin(od),  .data(oc), .start(next_ic),  .last(last_oc),
+                        .clk(clk),   .rst(wrst),            .next(next_oc),   .en(last_ki&wen) );
+
+   wire [9:0]        kie = (backprop) ? ks : ((bwrite) ? 0 : fs);
+
+   loop1 #(.W(10)) l_ki(.ini(10'd0), .fin(kie), .data(ki), .start(next_oc), .last(last_ki),
+                        .clk(clk),   .rst(wrst),            .next(next_ki),   .en(wen)  );
+
+   assign prm_v = oc;
+   assign prm_a = (backprop) ? (ic*(ks+1) + ks - ki) : ki;
+
 endmodule
 
 module out_ctrl
   (
-   input wire        clk,
-   input wire        run,
-   input wire        s_init,
-   output wire       out_busy,
-   input wire        k_fin,
-   input wire [3:0]  od,
-   input wire [9:0]  os,
-   output reg        outr,
-   output reg [3:0]  ra,
-   output reg [11:0] oa
+   input wire         clk,
+   input wire         rst,
+   input wire         s_init,
+   output wire        out_busy,
+   input wire         k_fin,
+   input wire [3:0]   od,
+   input wire [9:0]   os,
+   output wire        outr,
+   output wire [3:0]  ra,
+   output wire [11:0] oa
    );
 
-   reg [3:0]        cnt;
-   reg [9:0]        wi;
+   wire              last_wi, last_ct;
+   wire              next_wi, next_ct;
+   reg [9:0]         wi;
+   reg [3:0]                  ct;
 
-   reg              out0;
+   wire              k_fin0, k_fin1, start;
 
-   assign out_busy = (cnt!=od);
+   dff #(.W(1)) d_k_fin0 (.in(k_fin), .data(k_fin0), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_k_fin1 (.in(k_fin0), .data(k_fin1), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_start (.in(k_fin1), .data(start), .clk(clk), .rst(rst), .en(1'b1));
 
-   always_ff @(posedge clk)begin
-      if(~run)begin
-         out0 <= 0;
-         cnt <= od;
-      end else if(k_fin)begin
-         out0 <= 1;
-         cnt <= 0;
-      end else if(cnt!=od)begin
-         out0 <= 1;
-         cnt <= cnt+1;
-      end else begin
-         out0 <= 0;
-      end
+   dff #(.W(1)) d_out_busy (.in((k_fin|out_busy)&((ct+3)<od)), .data(out_busy),
+                            .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_outr (.in(k_fin1|outr&(ct!=od)), .data(outr), .clk(clk), .rst(rst), .en(1'b1));
 
-      outr <= out0;
+   loop1 #(.W(10)) l_wi(.ini(10'd0), .fin(os-1),.data(wi), .start(s_init),  .last(last_wi),
+                        .clk(clk),   .rst(rst),             .next(next_wi),   .en(last_ct)  );
 
-      if(~run)begin
-         ra <= 0;
-      end else if(out0)begin
-         ra <= cnt;
-         if(outr)begin
-            oa <= oa+os;
-         end else begin
-            oa <= wi;
-         end
-      end
+   loop1 #(.W(4))  l_ct(.ini(4'd0),  .fin(od),  .data(ct), .start(start),   .last(last_ct),
+                        .clk(clk),   .rst(rst),             .next(next_ct),   .en(1'b1)  );
 
-      if(~run|s_init)begin
-         wi <= 0;
-      end else if(~out0&outr)begin
-         wi <= wi+1;
-      end
-   end
+   assign ra = ct;
+   assign oa = ct*os+wi;
 
 endmodule

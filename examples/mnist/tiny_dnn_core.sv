@@ -108,13 +108,18 @@ module tiny_dnn_core
 
    reg [15:0]         W [0:f_size-1];
 
-   reg                execl, biasl;
-   reg [15:0]         Wl;
-   wire [15:0]        dl = (execl) ? d : 16'h3f80;
+   reg                init1, exec1, bias1, init2, exec2, bias2;
+   reg [15:0]         W1, W2;
+   reg [15:0]         d2;
+   
 
    always_ff @(posedge clk)begin
-      execl <= exec;
-      biasl <= bias;
+      init1 <= init;
+      exec1 <= exec;
+      bias1 <= bias;
+      init2 <= init1;
+      exec2 <= exec1;
+      bias2 <= bias1;
    end
 
    wire [9:0]    radr = (bias)   ? f_size-1 : ra ;
@@ -122,7 +127,13 @@ module tiny_dnn_core
 
    always_ff @(posedge clk)
      if(exec|bias)
-       Wl <= W[radr];
+       W1 <= W[radr];
+
+   always_ff @(posedge clk)
+     if(exec1|bias1)begin
+        W2 <= W1;
+        d2 <= (exec1) ? d : 16'h3f80;
+     end
 
    always_ff @(posedge clk)
      if(write)
@@ -131,10 +142,10 @@ module tiny_dnn_core
    fma fma
      (
       .clk(clk),
-      .init(init),
-      .exec(execl|biasl),
-      .w(Wl[15:0]),
-      .d(dl[15:0]),
+      .init(init2),
+      .exec(exec2|bias2),
+      .w(W2[15:0]),
+      .d(d2[15:0]),
       .signo(signo),
       .expo(expo[9:0]),
       .addo(addo[31:0])

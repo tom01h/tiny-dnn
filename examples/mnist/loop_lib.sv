@@ -24,7 +24,7 @@ module loop1
       if(rst)begin
          run <= 1'b0;
          data <= ini;
-      end if (start|run)begin
+      end else if(start|run)begin
          if(last)begin
             if(en)begin
                data <= ini;
@@ -56,7 +56,7 @@ module dff
    always @(posedge clk)begin
       if(rst)begin
          data <= 'h0;
-      end if (en)begin
+      end else if(en)begin
          data <= in;
       end
    end
