@@ -134,14 +134,15 @@ module out_ctrl
    reg [9:0]         wi;
    reg [3:0]                  ct;
 
-   wire              k_fin0, start;
+   wire              k_fin0, k_fin1, start;
 
    dff #(.W(1)) d_k_fin0 (.in(k_fin), .data(k_fin0), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_start (.in(k_fin0), .data(start), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_k_fin1 (.in(k_fin0), .data(k_fin1), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_start (.in(k_fin1), .data(start), .clk(clk), .rst(rst), .en(1'b1));
 
-   dff #(.W(1)) d_out_busy (.in((k_fin|out_busy)&((ct+2)<od)), .data(out_busy),
+   dff #(.W(1)) d_out_busy (.in((k_fin|out_busy)&((ct+3)<od)), .data(out_busy),
                             .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_outr (.in(k_fin0|outr&(ct!=od)), .data(outr), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_outr (.in(k_fin1|outr&(ct!=od)), .data(outr), .clk(clk), .rst(rst), .en(1'b1));
 
    loop1 #(.W(10)) l_wi(.ini(10'd0), .fin(os-1),.data(wi), .start(s_init),  .last(last_wi),
                         .clk(clk),   .rst(rst),             .next(next_wi),   .en(last_ct)  );
