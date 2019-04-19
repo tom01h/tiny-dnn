@@ -121,12 +121,15 @@ module out_ctrl
    input wire         rst,
    input wire         s_init,
    output wire        out_busy,
+   input wire         k_init,
    input wire         k_fin,
    input wire [3:0]   od,
    input wire [9:0]   os,
    output wire        outr,
    output wire [3:0]  ra,
-   output wire [11:0] oa
+   output wire [11:0] oa,
+   output wire        sum_ip,
+   output wire        sum_op
    );
 
    wire              last_wi, last_ct;
@@ -136,13 +139,22 @@ module out_ctrl
 
    wire              k_fin0, k_fin1, start;
 
-   dff #(.W(1)) d_k_fin0 (.in(k_fin), .data(k_fin0), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_k_fin0 (.in(k_fin), .data(k_fin0), .clk(clk), .rst(rst), .en(!out_busy1|k_fin));
    dff #(.W(1)) d_k_fin1 (.in(k_fin0), .data(k_fin1), .clk(clk), .rst(rst), .en(1'b1));
    dff #(.W(1)) d_start (.in(k_fin1), .data(start), .clk(clk), .rst(rst), .en(1'b1));
 
-   dff #(.W(1)) d_out_busy (.in((k_fin|out_busy)&((ct+3)<od)), .data(out_busy),
+   wire              out_busy0, out_busy1;
+   dff #(.W(1)) d_out_busy0 (.in(k_fin|out_busy0&((ct+2)!=od)|out_busy1), .data(out_busy0),
+                             .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_out_busy1 (.in((k_fin|out_busy1)&out_busy), .data(out_busy1),
+                             .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_out_busy (.in((k_init&out_busy0|out_busy)&((ct+2)!=od)), .data(out_busy),
                             .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_outr (.in(k_fin1|outr&(ct!=od)), .data(outr), .clk(clk), .rst(rst), .en(1'b1));
+
+   wire              outr_in = k_fin1|outr&!last_ct;
+   dff #(.W(1)) d_outr (.in(outr_in), .data(outr), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_sum_ip (.in(outr_in^sum_ip), .data(sum_ip), .clk(clk), .rst(rst), .en(!outr|last_ct));
+   dff #(.W(1)) d_sum_op (.in((outr&last_ct)^sum_op), .data(sum_op), .clk(clk), .rst(rst), .en(1'b1));
 
    loop1 #(.W(10)) l_wi(.ini(10'd0), .fin(os-1),.data(wi), .start(s_init),  .last(last_wi),
                         .clk(clk),   .rst(rst),             .next(next_wi),   .en(last_ct)  );

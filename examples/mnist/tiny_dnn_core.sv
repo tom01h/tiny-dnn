@@ -5,6 +5,8 @@ module tiny_dnn_core
    input wire       write,
    input wire       bwrite,
    input wire       exec,
+   input wire       sum_ip,
+   input wire       sum_op,
    input wire       bias,
    input wire [9:0] ra,
    input wire [9:0] wa,
@@ -21,6 +23,9 @@ module tiny_dnn_core
 
    wire [9:0]    radr = (bias)   ? f_size-1 : ra ;
    wire [9:0]    wadr = (bwrite) ? f_size-1 : wa ;
+
+   real          sumi [1:0];
+   assign sum = sumi[sum_op];
 
    always_ff @(posedge clk)begin
       if(write)begin
@@ -40,13 +45,13 @@ module tiny_dnn_core
       exec2 <= exec1;
       bias2 <= bias1;
       if(init2)begin
-         sum <= 0;
+         sumi[sum_ip] <= 0;
       end
       if(exec2)begin
-         sum <= sum + w1 * d1;
+         sumi[sum_ip] <= sumi[sum_ip] + w1 * d1;
       end
       if(bias2)begin
-         sum <= sum + w1;
+         sumi[sum_ip] <= sumi[sum_ip] + w1;
       end
    end
 

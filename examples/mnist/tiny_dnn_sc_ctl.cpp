@@ -1,3 +1,8 @@
+/***************************************\
+* This module has not been maintained   *
+*   since version 1edf594.              *
+\***************************************/
+
 #include "tiny_dnn_sc_ctl.h"
 
 void tiny_dnn_sc_ctl::exect()
