@@ -7,6 +7,7 @@ module tiny_dnn_ex_ctl
    input wire         bwrite,
    input wire         s_init,
    input wire         out_busy,
+   input wire         outr,
    output wire        s_fin,
    output wire        k_init,
    output wire        k_fin,
@@ -53,9 +54,9 @@ module tiny_dnn_ex_ctl
    wire [4:0]         ex = (backprop) ? ((ix>iw) ? iw-xx : kw) : kw;
 
    wire               k_init0, start;
-   wire               k_init_in = s_init | k_init0&!out_busy;
+   assign k_init = s_init0 | k_init0&!out_busy;
 
-   dff #(.W(1)) d_k_init (.in(k_init_in), .data(k_init), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_s_init0(.in(s_init), .data(s_init0), .clk(clk), .rst(rst), .en(1'b1));
    dff #(.W(1)) d_exec   (.in(k_init|exec&!last_ic), .data(exec), .clk(clk), .rst(rst), .en(1'b1));
    dff #(.W(1)) d_start  (.in(k_init), .data(start), .clk(clk), .rst(rst), .en(1'b1));
 
@@ -80,17 +81,19 @@ module tiny_dnn_ex_ctl
 
    dff #(.W(1)) d_k_fin (.in(last_ic), .data(k_fin), .clk(clk), .rst(rst), .en(1'b1));
    dff #(.W(1)) d_k_init0 (.in(next_ix&!s_init), .data(k_init0), .clk(clk),
-                           .rst(rst), .en(!out_busy));
+                           .rst(rst), .en(!out_busy|next_ix));
 
 // ix loop end
 // iy loop end
 // dc loop end
 
-   wire               s_fin0, s_fin1, s_fin2;
+   wire               s_fin0, s_fin1, s_fin2, s_fin3;
 
    dff #(.W(1)) d_s_fin0 (.in(last_dc), .data(s_fin0), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_s_fin1 (.in(s_fin0), .data(s_fin1), .clk(clk), .rst(rst), .en(!out_busy));
-   dff #(.W(1)) d_s_fin2 (.in(s_fin1&!out_busy), .data(s_fin2), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_s_fin  (.in(s_fin2), .data(s_fin), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_s_fin1 (.in(s_fin0), .data(s_fin1), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_s_fin2 (.in(s_fin1), .data(s_fin2), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_s_fin3 (.in(s_fin2), .data(s_fin3), .clk(clk), .rst(rst), .en(!outr|s_fin2));
+
+   assign s_fin = s_fin3 & !outr;
 
 endmodule
