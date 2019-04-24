@@ -53,7 +53,7 @@ module tiny_dnn_ex_ctl
    wire [4:0]         sx = (backprop) ? ((xx<0)  ? -xx   : 0)  : 0;
    wire [4:0]         ex = (backprop) ? ((ix>iw) ? iw-xx : kw) : kw;
 
-   wire               k_init0, start;
+   wire               s_init0, k_init0, start;
    assign k_init = s_init0 | k_init0&!out_busy;
 
    dff #(.W(1)) d_s_init0(.in(s_init), .data(s_init0), .clk(clk), .rst(rst), .en(1'b1));

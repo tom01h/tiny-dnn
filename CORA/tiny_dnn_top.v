@@ -136,6 +136,7 @@ module tiny_dnn_top
    wire               outr;
    wire [3:0]         ra;
    wire [11:0]        oa;
+   wire               sum_update;
 
    // batch control -> weight buffer
    wire [3:0]         prm_v;
@@ -206,15 +207,17 @@ module tiny_dnn_top
    out_ctrl out_ctrl
      (
       .clk(clk),
-      .run(run),
+      .rst(~run),
       .s_init(s_init),
+      .k_init(k_init),
       .k_fin(k_fin),
       .out_busy(out_busy),
       .od(od[3:0]),
       .os(os[9:0]),
       .outr(outr),
       .ra(ra[3:0]),
-      .oa(oa[11:0])
+      .oa(oa[11:0]),
+      .update(sum_update)
       );
 
    tiny_dnn_ex_ctl tiny_dnn_ex_ctl
@@ -226,6 +229,7 @@ module tiny_dnn_top
       .bwrite(bwrite),
       .s_init(s_init),
       .out_busy(out_busy),
+      .outr(outr),
       .s_fin(s_fin),
       .k_init(k_init),
       .k_fin(k_fin),
@@ -275,6 +279,7 @@ module tiny_dnn_top
                 .write((wwrite|bwrite)&(prm_v[3:0] == i) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
+                .update(sum_update),
                 .bias(k_fin&enbias),
                 .ra(wa[9:0]),
                 .wa(prm_a[9:0]),

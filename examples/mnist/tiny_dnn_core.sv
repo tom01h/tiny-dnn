@@ -94,8 +94,7 @@ module tiny_dnn_core
    input wire                write,
    input wire                bwrite,
    input wire                exec,
-   input wire                sum_ip,
-   input wire                sum_op,
+   input wire                update,
    input wire                bias,
    input wire [9:0]          ra,
    input wire [9:0]          wa,
@@ -146,8 +145,7 @@ module tiny_dnn_core
       .clk(clk),
       .init(init2),
       .exec(exec2|bias2),
-      .sum_ip(sum_ip),
-      .sum_op(sum_op),
+      .update(update),
       .w(W2[15:0]),
       .d(d2[15:0]),
       .signo(signo),
@@ -159,16 +157,15 @@ endmodule
 
 module fma
   (
-   input wire                clk,
-   input wire                init,
-   input wire                exec,
-   input wire                sum_ip,
-   input wire                sum_op,
-   input wire [15:0]         w,
-   input wire [15:0]         d,
-   output wire               signo,
-   output wire signed [9:0]  expo,
-   output wire signed [31:0] addo
+   input wire               clk,
+   input wire               init,
+   input wire               exec,
+   input wire               update,
+   input wire [15:0]        w,
+   input wire [15:0]        d,
+   output reg               signo,
+   output reg signed [9:0]  expo,
+   output reg signed [31:0] addo
    );
 
    reg signed [16:0]         frac;
@@ -178,19 +175,19 @@ module fma
    reg signed [48:0]         alin;
    reg                       sftout;
 
-   reg [1:0]                 signi;
-   reg signed [1:0] [9:0]    expi;
-   reg signed [1:0] [31:0]   addi;
+   reg                       signl;
+   reg signed [9:0]          expl;
+   reg signed [31:0]         addl;
 
    always_comb begin
       frac = {9'h1,w[6:0]}  * {9'h1,d[6:0]};
       expm = {1'b0,w[14:7]} + {1'b0,d[14:7]};
-      expd = expm - expi[sum_ip] + 16;
+      expd = expm - expl + 16;
 
-      if(signi[sum_ip]^w[15]^d[15])
-        add0 = -addi[sum_ip];
+      if(signl^w[15]^d[15])
+        add0 = -addl;
       else
-        add0 = addi[sum_ip];
+        add0 = addl;
 
       if(expd[9:6]!=0)
         alin = 0;
@@ -200,21 +197,24 @@ module fma
       sftout = (expd<0) | (alin[48:30]!={19{1'b0}}) & (alin[48:30]!={19{1'b1}});
    end
 
-   assign signo = signi[sum_op];
-   assign expo = expi[sum_op];
-   assign addo = addi[sum_op];
-
    always_ff @(posedge clk)begin
       if(init)begin
-         signi[sum_ip] <= 0;
-         expi[sum_ip] <= 0;
-         addi[sum_ip] <= 0;
-      end else if(exec)begin
-         if(~sftout)begin
-            signi[sum_ip] <= w[15]^d[15];
-            expi[sum_ip] <= expm;
-            addi[sum_ip] <= frac + alin;
+         signl <= 0;
+         expl <= 0;
+         addl <= 0;
+      end else if(exec&!sftout)begin
+         signl <= w[15]^d[15];
+         expl <= expm;
+         addl <= frac + alin;
+         if(update)begin
+            signo <= w[15]^d[15];
+            expo <= expm;
+            addo <= frac + alin;
          end
+      end else if(update)begin
+         signo <= signl;
+         expo <= expl;
+         addo <= addl;
       end
    end
 
