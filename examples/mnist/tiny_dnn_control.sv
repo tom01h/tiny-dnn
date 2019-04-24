@@ -138,6 +138,7 @@ module out_ctrl
 
    wire              k_fin0, k_fin1, start;
    wire              out_busy0, out_busy1;
+   wire              update0;
 
    dff #(.W(1)) d_k_fin0 (.in(k_fin), .data(k_fin0), .clk(clk), .rst(rst), .en(!out_busy1|k_fin));
    dff #(.W(1)) d_k_fin1 (.in(k_fin0), .data(k_fin1), .clk(clk), .rst(rst), .en(1'b1));
@@ -152,7 +153,8 @@ module out_ctrl
 
    wire              outr_in = k_fin1|outr&!last_ct;
    dff #(.W(1)) d_outr (.in(outr_in), .data(outr), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_update (.in(out_busy0&~out_busy), .data(update), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_update0 (.in(out_busy0&~out_busy), .data(update0), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_update (.in(update0), .data(update), .clk(clk), .rst(rst), .en(1'b1));
 
    loop1 #(.W(10)) l_wi(.ini(10'd0), .fin(os-1),.data(wi), .start(s_init),  .last(last_wi),
                         .clk(clk),   .rst(rst),             .next(next_wi),   .en(last_ct)  );

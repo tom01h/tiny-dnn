@@ -23,7 +23,9 @@ module tiny_dnn_core
    wire [9:0]    radr = (bias)   ? f_size-1 : ra ;
    wire [9:0]    wadr = (bwrite) ? f_size-1 : wa ;
 
-   real          suml;
+   real          sumt, suml;
+
+   assign sum  = (update) ? suml  : sumt;
 
    always_ff @(posedge clk)begin
       if(write)begin
@@ -46,16 +48,11 @@ module tiny_dnn_core
          suml <= 0;
       end else if(exec2)begin
          suml <= suml + w1 * d1;
-         if(update)begin
-            sum <= suml + w1 * d1;
-         end
       end else if(bias2)begin
          suml <= suml + w1;
-         if(update)begin
-            sum <= suml + w1;
-         end
-      end else if(update)begin
-         sum <= suml;
+      end
+      if(update)begin
+         sumt <= suml;
       end
    end
 
