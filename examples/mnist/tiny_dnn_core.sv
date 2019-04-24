@@ -157,15 +157,15 @@ endmodule
 
 module fma
   (
-   input wire               clk,
-   input wire               init,
-   input wire               exec,
-   input wire               update,
-   input wire [15:0]        w,
-   input wire [15:0]        d,
-   output reg               signo,
-   output reg signed [9:0]  expo,
-   output reg signed [31:0] addo
+   input wire                clk,
+   input wire                init,
+   input wire                exec,
+   input wire                update,
+   input wire [15:0]         w,
+   input wire [15:0]         d,
+   output wire               signo,
+   output wire signed [9:0]  expo,
+   output wire signed [31:0] addo
    );
 
    reg signed [16:0]         frac;
@@ -178,6 +178,9 @@ module fma
    reg                       signl;
    reg signed [9:0]          expl;
    reg signed [31:0]         addl;
+   reg                       signt;
+   reg signed [9:0]          expt;
+   reg signed [31:0]         addt;
 
    always_comb begin
       frac = {9'h1,w[6:0]}  * {9'h1,d[6:0]};
@@ -197,6 +200,10 @@ module fma
       sftout = (expd<0) | (alin[48:30]!={19{1'b0}}) & (alin[48:30]!={19{1'b1}});
    end
 
+   assign signo = (update) ? signl : signt;
+   assign expo  = (update) ? expl  : expt;
+   assign addo  = (update) ? addl  : addt;
+
    always_ff @(posedge clk)begin
       if(init)begin
          signl <= 0;
@@ -206,15 +213,11 @@ module fma
          signl <= w[15]^d[15];
          expl <= expm;
          addl <= frac + alin;
-         if(update)begin
-            signo <= w[15]^d[15];
-            expo <= expm;
-            addo <= frac + alin;
-         end
-      end else if(update)begin
-         signo <= signl;
-         expo <= expl;
-         addo <= addl;
+      end
+      if(update)begin
+         signt <= signl;
+         expt <= expl;
+         addt <= addl;
       end
    end
 
