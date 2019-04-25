@@ -5,12 +5,14 @@ module tiny_dnn_core
    input wire       write,
    input wire       bwrite,
    input wire       exec,
+   input wire       outr,
    input wire       update,
    input wire       bias,
    input wire [9:0] ra,
    input wire [9:0] wa,
    input real       d,
    input real       wd,
+   input real       sum_in,
    output real      sum
    );
 
@@ -30,8 +32,7 @@ module tiny_dnn_core
    always_ff @(posedge clk)begin
       if(write)begin
          W[wadr] <= wd;
-      end
-      if(exec|bias)begin
+      end else if(exec|bias)begin
          w <= W[radr];
       end
       if(exec1|bias1)begin
@@ -51,8 +52,8 @@ module tiny_dnn_core
       end else if(bias2)begin
          suml <= suml + w1;
       end
-      if(update)begin
-         sumt <= suml;
+      if(outr)begin
+         sumt <= sum_in;
       end
    end
 

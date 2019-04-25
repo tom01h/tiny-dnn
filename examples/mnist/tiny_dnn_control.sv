@@ -126,7 +126,6 @@ module out_ctrl
    input wire [3:0]   od,
    input wire [9:0]   os,
    output wire        outr,
-   output wire [3:0]  ra,
    output wire [11:0] oa,
    output wire        update
    );
@@ -138,11 +137,12 @@ module out_ctrl
 
    wire              k_fin0, k_fin1, start;
    wire              out_busy0, out_busy1;
-   wire              update0;
 
-   dff #(.W(1)) d_k_fin0 (.in(k_fin), .data(k_fin0), .clk(clk), .rst(rst), .en(!out_busy1|k_fin));
-   dff #(.W(1)) d_k_fin1 (.in(k_fin0), .data(k_fin1), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_start (.in(k_fin1), .data(start), .clk(clk), .rst(rst), .en(1'b1));
+   assign update = start;
+
+   dff #(.W(1)) d_k_fin0 (.in(k_fin), .data(k_fin0), .clk(clk), .rst(rst), .en(1'b1));
+   dff #(.W(1)) d_k_fin1 (.in(k_fin0), .data(k_fin1), .clk(clk), .rst(rst), .en(!out_busy1|k_fin0));
+   dff #(.W(1)) d_start (.in(k_fin1&!out_busy1), .data(start), .clk(clk), .rst(rst), .en(1'b1));
 
    dff #(.W(1)) d_out_busy0 (.in(k_fin|out_busy0&((ct+2)!=od)|out_busy1), .data(out_busy0),
                              .clk(clk), .rst(rst), .en(1'b1));
@@ -153,8 +153,6 @@ module out_ctrl
 
    wire              outr_in = k_fin1|outr&!last_ct;
    dff #(.W(1)) d_outr (.in(outr_in), .data(outr), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_update0 (.in(out_busy0&~out_busy), .data(update0), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_update (.in(update0), .data(update), .clk(clk), .rst(rst), .en(1'b1));
 
    loop1 #(.W(10)) l_wi(.ini(10'd0), .fin(os-1),.data(wi), .start(s_init),  .last(last_wi),
                         .clk(clk),   .rst(rst),             .next(next_wi),   .en(last_ct)  );
@@ -162,7 +160,6 @@ module out_ctrl
    loop1 #(.W(4))  l_ct(.ini(4'd0),  .fin(od),  .data(ct), .start(start),   .last(last_ct),
                         .clk(clk),   .rst(rst),             .next(next_ct),   .en(1'b1)  );
 
-   assign ra = ct;
    assign oa = ct*os+wi;
 
 endmodule
