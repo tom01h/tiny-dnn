@@ -14,8 +14,7 @@ module src_buf
    always_ff @(posedge clk)begin
       if(src_v)begin
          buff[src_a] <= src_d;
-      end
-      if(exec)begin
+      end else if(exec)begin
          d <= buff[ia];
       end
    end
@@ -49,8 +48,7 @@ module dst_buf
    always_ff @(posedge clk)begin
       if(outrl)begin
          buff[oal] <= x;
-      end
-      if(dst_v)begin
+      end else if(dst_v)begin
          dst_d <= buff[dst_a];
       end
    end

@@ -61,7 +61,6 @@ module tiny_dnn_top
    wire [11:0]        ia;
    // out control -> core, dst buffer
    wire               outr;
-   wire [3:0]         ra;
    wire [11:0]        oa;
    wire               sum_update;
 
@@ -143,7 +142,6 @@ module tiny_dnn_top
       .od(od[3:0]),
       .os(os[9:0]),
       .outr(outr),
-      .ra(ra[3:0]),
       .oa(oa[11:0]),
       .update(sum_update)
       );
@@ -193,9 +191,9 @@ module tiny_dnn_top
       .rst(~run)
       );
 
-   wire               signo [0:15];
-   wire signed [9:0]  expo [0:15];
-   wire signed [31:0] addo [0:15];
+   wire               signo [0:f_num];
+   wire signed [9:0]  expo [0:f_num];
+   wire signed [31:0] addo [0:f_num];
    wire [31:0]        nrm;
 
    assign x = nrm;
@@ -204,11 +202,15 @@ module tiny_dnn_top
      (
       .clk(clk),
       .en(outr),
-      .signo(signo[ra]),
-      .expo(expo[ra]),
-      .addo(addo[ra]),
+      .signo(signo[0]),
+      .expo(expo[0]),
+      .addo(addo[0]),
       .nrm(nrm)
       );
+
+   assign signo[f_num] = 0;
+   assign expo[f_num] = 0;
+   assign addo[f_num] = 0;
 
    generate
       genvar i;
@@ -220,12 +222,16 @@ module tiny_dnn_top
                 .write((wwrite|bwrite)&(prm_v[3:0] == i) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
+                .outr(outr),
                 .update(sum_update),
                 .bias(k_fin&enbias),
                 .ra(wa[9:0]),
                 .wa(prm_a[9:0]),
                 .d(d),
                 .wd(src_data[31:16]),
+                .signi(signo[i+1]),
+                .expi(expo[i+1]),
+                .addi(addo[i+1]),
                 .signo(signo[i]),
                 .expo(expo[i]),
                 .addo(addo[i])

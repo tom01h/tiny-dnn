@@ -94,12 +94,16 @@ module tiny_dnn_core
    input wire                write,
    input wire                bwrite,
    input wire                exec,
+   input wire                outr,
    input wire                update,
    input wire                bias,
    input wire [9:0]          ra,
    input wire [9:0]          wa,
    input wire [15:0]         d, // bfloat16
    input wire [15:0]         wd, // bfloat16
+   input wire                signi,
+   input wire signed [9:0]   expi,
+   input wire signed [31:0]  addi,
    output wire               signo,
    output wire signed [9:0]  expo,
    output wire signed [31:0] addo
@@ -127,8 +131,11 @@ module tiny_dnn_core
    wire [9:0]    wadr = (bwrite) ? f_size-1 : wa ;
 
    always_ff @(posedge clk)
-     if(exec|bias)
-       W1 <= W[radr];
+     if(write)begin
+        W[wadr] <= wd;
+     end else if(exec|bias)begin
+        W1 <= W[radr];
+     end
 
    always_ff @(posedge clk)
      if(exec1|bias1)begin
@@ -136,9 +143,23 @@ module tiny_dnn_core
         d2 <= (exec1) ? d : 16'h3f80;
      end
 
+   wire                       signl;
+   wire signed [9:0]          expl;
+   wire signed [31:0]         addl;
+   reg                        signt;
+   reg signed [9:0]           expt;
+   reg signed [31:0]          addt;
+
+   assign signo = (update) ? signl : signt;
+   assign expo  = (update) ? expl  : expt;
+   assign addo  = (update) ? addl  : addt;
+
    always_ff @(posedge clk)
-     if(write)
-       W[wadr] <= wd;
+     if(outr)begin
+        signt <= signi;
+        expt <= expi;
+        addt <= addi;
+     end
 
    fma fma
      (
@@ -148,24 +169,24 @@ module tiny_dnn_core
       .update(update),
       .w(W2[15:0]),
       .d(d2[15:0]),
-      .signo(signo),
-      .expo(expo[9:0]),
-      .addo(addo[31:0])
+      .signo(signl),
+      .expo(expl[9:0]),
+      .addo(addl[31:0])
    );
 
 endmodule
 
 module fma
   (
-   input wire                clk,
-   input wire                init,
-   input wire                exec,
-   input wire                update,
-   input wire [15:0]         w,
-   input wire [15:0]         d,
-   output wire               signo,
-   output wire signed [9:0]  expo,
-   output wire signed [31:0] addo
+   input wire               clk,
+   input wire               init,
+   input wire               exec,
+   input wire               update,
+   input wire [15:0]        w,
+   input wire [15:0]        d,
+   output reg               signo,
+   output reg signed [9:0]  expo,
+   output reg signed [31:0] addo
    );
 
    reg signed [16:0]         frac;
@@ -175,22 +196,15 @@ module fma
    reg signed [48:0]         alin;
    reg                       sftout;
 
-   reg                       signl;
-   reg signed [9:0]          expl;
-   reg signed [31:0]         addl;
-   reg                       signt;
-   reg signed [9:0]          expt;
-   reg signed [31:0]         addt;
-
    always_comb begin
       frac = {9'h1,w[6:0]}  * {9'h1,d[6:0]};
       expm = {1'b0,w[14:7]} + {1'b0,d[14:7]};
-      expd = expm - expl + 16;
+      expd = expm - expo + 16;
 
-      if(signl^w[15]^d[15])
-        add0 = -addl;
+      if(signo^w[15]^d[15])
+        add0 = -addo;
       else
-        add0 = addl;
+        add0 = addo;
 
       if(expd[9:6]!=0)
         alin = 0;
@@ -200,24 +214,15 @@ module fma
       sftout = (expd<0) | (alin[48:30]!={19{1'b0}}) & (alin[48:30]!={19{1'b1}});
    end
 
-   assign signo = (update) ? signl : signt;
-   assign expo  = (update) ? expl  : expt;
-   assign addo  = (update) ? addl  : addt;
-
    always_ff @(posedge clk)begin
       if(init)begin
-         signl <= 0;
-         expl <= 0;
-         addl <= 0;
+         signo <= 0;
+         expo <= 0;
+         addo <= 0;
       end else if(exec&!sftout)begin
-         signl <= w[15]^d[15];
-         expl <= expm;
-         addl <= frac + alin;
-      end
-      if(update)begin
-         signt <= signl;
-         expt <= expl;
-         addt <= addl;
+         signo <= w[15]^d[15];
+         expo <= expm;
+         addo <= frac + alin;
       end
    end
 
