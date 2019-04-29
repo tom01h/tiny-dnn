@@ -48,6 +48,7 @@ $ ${SDK path}/gnu/aarch64/nt/aarch64-linux/bin/aarch64-linux-gnu-g++.exe -O3 -mt
 
 - AXI-Stream マスタは最後の転送で LAST を出す
 - バス幅を広げる
+- 16bit 転送にする
 - 転送と演算と並列実行する
   - (済) ユーザ空間 ⇔ DMA バッファ間の転送
   - DMA バッファ ⇔ IP 内バッファの転送

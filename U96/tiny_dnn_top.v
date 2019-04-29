@@ -85,6 +85,7 @@ module tiny_dnn_top
    wire [9:0]         ks;
    wire [4:0]         kh;
    wire [4:0]         kw;
+   wire [3:0]         dd;
 
 
    tiny_dnn_reg tiny_dnn_reg
@@ -115,27 +116,30 @@ module tiny_dnn_top
       .run(run), .wwrite(wwrite), .bwrite(bwrite),
       .ss(ss), .id(id), .is(is), .ih(ih), .iw(iw),
       .ds(ds), .od(od), .os(os), .oh(oh), .ow(ow),
-      .fs(fs),          .ks(ks), .kh(kh), .kw(kw)
+      .fs(fs),          .ks(ks), .kh(kh), .kw(kw), .dd(dd)
       );
 
-   //  batch control <-> sample control
+   // batch control <-> sample control
    wire               s_init;
    wire               s_fin;
+   wire               out_busy;
 
    // sample control -> core
    wire               k_init;
    wire               k_fin;
-   wire [3:0]         kn;
    wire [9:0]         wa;
-   wire [3:0]         ra;
 
    // sample control -> core, src buffer
    wire               exec;
    wire [11:0]        ia;
-   // sample control -> core, dst buffer
+   // out control -> core, dst buffer
    wire               outr;
    wire [11:0]        oa;
+   wire               sum_update;
 
+   // batch control -> weight buffer
+   wire [3:0]         prm_v;
+   wire [9:0]         prm_a;
    // batch control -> src buffer
    wire               src_v;
    wire [11:0]        src_a;
@@ -152,18 +156,29 @@ module tiny_dnn_top
       .clk(clk),
       .s_init(s_init),
       .s_fin(s_fin),
+      .backprop(backprop),
       .run(run),
+      .wwrite(wwrite),
+      .bwrite(bwrite),
+
       .src_valid(src_valid),
       .src_last(src_last),
       .src_ready(src_ready),
-      .src_v(src_v),
-      .src_a(src_a[11:0]),
       .dst_valid(dst_valid),
       .dst_ready(dst_ready),
+
+      .prm_v(prm_v[3:0]),
+      .prm_a(prm_a[9:0]),
+      .src_v(src_v),
+      .src_a(src_a[11:0]),
       .dst_v(dst_v),
       .dst_a(dst_a[11:0]),
       .ss(ss[11:0]),
-      .ds(ds[11:0])
+      .ds(ds[11:0]),
+      .id(id[3:0]),
+      .od(od[3:0]),
+      .fs(fs[9:0]),
+      .ks(ks[9:0])
       );
 
    src_buf src_buf
@@ -188,43 +203,56 @@ module tiny_dnn_top
       .x(x)
       );
 
-   sample_ctrl sample_ctrl
+   out_ctrl out_ctrl
      (
       .clk(clk),
-      .src_valid(src_valid),
-      .src_ready(src_ready),
+      .rst(~run),
+      .s_init(s_init),
+      .k_init(k_init),
+      .k_fin(k_fin),
+      .out_busy(out_busy),
+      .od(od[3:0]),
+      .os(os[9:0]),
+      .outr(outr),
+      .oa(oa[11:0]),
+      .update(sum_update)
+      );
+
+   tiny_dnn_ex_ctl tiny_dnn_ex_ctl
+     (
+      .clk(clk),
       .backprop(backprop),
       .run(run),
       .wwrite(wwrite),
       .bwrite(bwrite),
       .s_init(s_init),
+      .out_busy(out_busy),
+      .outr(outr),
       .s_fin(s_fin),
       .k_init(k_init),
       .k_fin(k_fin),
       .exec(exec),
-      .ia(ia[11:0]),
-      .outr(outr),
-      .oa(oa[11:0]),
-      .kn(kn[3:0]),
-      .wa(wa[9:0]),
-      .ra(ra[3:0]),
-      .id(id[3:0]),
-      .is(is[9:0]),
-      .ih(ih[4:0]),
-      .iw(iw[4:0]),
-      .od(od[3:0]),
-      .os(os[9:0]),
-      .oh(oh[4:0]),
-      .ow(ow[4:0]),
-      .fs(fs[9:0]),
-      .ks(ks[9:0]),
-      .kh(kh[4:0]),
-      .kw(kw[4:0])
+      .ia(ia),
+      .wa(wa),
+      .dd(dd),
+      .id(id),
+      .is(is),
+      .ih(ih),
+      .iw(iw),
+      .od(od),
+      .os(os),
+      .oh(oh),
+      .ow(ow),
+      .fs(fs),
+      .ks(ks),
+      .kh(kh),
+      .kw(kw),
+      .rst(~run)
       );
 
-   wire               signo [0:15];
-   wire signed [9:0]  expo [0:15];
-   wire signed [31:0] addo [0:15];
+   wire               signo [0:f_num];
+   wire signed [9:0]  expo [0:f_num];
+   wire signed [31:0] addo [0:f_num];
    wire [31:0]        nrm;
 
    assign x = nrm;
@@ -233,11 +261,15 @@ module tiny_dnn_top
      (
       .clk(clk),
       .en(outr),
-      .signo(signo[ra]),
-      .expo(expo[ra]),
-      .addo(addo[ra]),
+      .signo(signo[0]),
+      .expo(expo[0]),
+      .addo(addo[0]),
       .nrm(nrm)
       );
+
+   assign signo[f_num] = 0;
+   assign expo[f_num] = 0;
+   assign addo[f_num] = 0;
 
    generate
       genvar i;
@@ -246,13 +278,19 @@ module tiny_dnn_top
                (
                 .clk(clk),
                 .init(k_init),
-                .write((wwrite|bwrite)&(kn[3:0] == i) & src_valid & src_ready),
+                .write((wwrite|bwrite)&(prm_v[3:0] == i) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
+                .outr(outr),
+                .update(sum_update),
                 .bias(k_fin&enbias),
-                .a(wa[9:0]),
+                .ra(wa[9:0]),
+                .wa(prm_a[9:0]),
                 .d(d),
                 .wd(src_data[31:16]),
+                .signi(signo[i+1]),
+                .expi(expo[i+1]),
+                .addi(addo[i+1]),
                 .signo(signo[i]),
                 .expo(expo[i]),
                 .addo(addo[i])

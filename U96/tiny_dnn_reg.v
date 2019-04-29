@@ -45,7 +45,8 @@ module tiny_dnn_reg
    output reg [9:0]  fs,
    output reg [9:0]  ks,
    output reg [4:0]  kh,
-   output reg [4:0]  kw
+   output reg [4:0]  kw,
+   output reg [3:0]  dd
    );
 
    reg [3:0]          axist;
@@ -125,6 +126,7 @@ module tiny_dnn_reg
            4'd13: S_AXI_RDATA <= {27'h0,oh[4:0]};
            4'd14: S_AXI_RDATA <= {27'h0,ow[4:0]};
 
+           4'd15: S_AXI_RDATA <= {28'h0,dd[3:0]};
            default: S_AXI_RDATA <= {32'h0};
          endcase
       end
@@ -153,6 +155,8 @@ module tiny_dnn_reg
            os[9:0] <= 0;
            oh[4:0] <= 0;
            ow[4:0] <= 0;
+
+           dd[3:0] <= 0;
       end else if(write)begin
          case(wb_adr_i[5:2])
            4'd0 : {backprop, enbias, run, wwrite, bwrite} <= wb_dat_i[4:0];
@@ -172,6 +176,8 @@ module tiny_dnn_reg
            4'd12: os[9:0] <= wb_dat_i[9:0];
            4'd13: oh[4:0] <= wb_dat_i[4:0];
            4'd14: ow[4:0] <= wb_dat_i[4:0];
+
+           4'd15: dd[3:0] <= wb_dat_i[3:0];
          endcase
       end
    end
