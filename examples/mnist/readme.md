@@ -110,7 +110,7 @@ menuconfig の画面で ```Filesystem Packages -> misc -> gcc-runtime -> libstdc
 
 DMA 転送に使うバッファ用に [udmabuf](https://github.com/ikwzm/udmabuf/blob/master/Readme.ja.md) を作る。
 
-```petalinux-create -t modules --name mymodule --enable
+```
 $ petalinux-create -t modules --name udmabuf --enable
 $ petalinux-build -c rootfs
 ```

@@ -118,10 +118,12 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     vkw = kw-1;
 
     verilator_top->backprop = 0;
+    verilator_top->deltaw = 0;
     verilator_top->enbias = 1;
     verilator_top->wwrite = 0;
     verilator_top->bwrite = 0;
     verilator_top->run = 0;
+    verilator_top->last = 0;
     verilator_top->src_valid = 0;
     verilator_top->dst_ready = 1;
 
@@ -172,35 +174,77 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     eval();
     verilator_top->src_valid = 1;
 
-    for (size_t sample = 0; sample < in_data.size(); sample++) {
-      size_t ina=0;
-      size_t outa=0;
-      const vec_t &in = in_data[sample];
-      vec_t &a        = out_data[sample];
+    size_t ina, outa;
 
-      while(!verilator_top->dst_valid) {
-        if(verilator_top->src_ready){
-          conv.f = in[ina++];
-          verilator_top->src_data = conv.i;
+    for(ina = 0; ina < iw*ih*id; ){
+      if(verilator_top->src_ready){
+        conv.f = in_data[0][ina++];
+        verilator_top->src_data = conv.i;
+      }
+      eval();
+    }
+
+    verilator_top->src_valid = 0;
+    eval();
+
+    for (size_t sample = 0; sample < in_data.size(); sample++) {
+      const vec_t &in = in_data[sample+1];
+      vec_t &a        = out_data[sample-1];
+
+      if(sample!=0){
+        while(!verilator_top->dst_valid) {
+          eval();
         }
+        for(outa = 0; outa < ow*oh*od; ){
+          conv.i = verilator_top->dst_data;
+          a[outa++] = conv.f;
+          eval();
+          if((outa%1024==0)&verilator_top->dst_valid){
+            verilator_top->dst_ready = 0;
+            eval();
+            verilator_top->dst_ready = 1;
+          }
+        }
+      }
+
+      for(int i = 0; i < 10; i++){
         eval();
       }
-      
-      while(verilator_top->dst_valid){
-        conv.i = verilator_top->dst_data;
-        a[outa++] = conv.f;
-        eval();
-        if((outa%1024==0)&verilator_top->dst_valid){
-          verilator_top->dst_ready = 0;
+
+      if(sample+1<in_data.size()){
+        verilator_top->src_valid = 1;
+        for(ina = 0; ina < iw*ih*id; ){
+          if(verilator_top->src_ready){
+            conv.f = in[ina++];
+            verilator_top->src_data = conv.i;
+          }
           eval();
-          verilator_top->dst_ready = 1;
         }
+        verilator_top->src_valid = 0;
+        eval();
+      }else{
+        verilator_top->last = 1;
+      }
+
+    }
+
+    while(!verilator_top->dst_valid) {
+      eval();
+    }
+    for(outa = 0; outa < ow*oh*od; ){
+      conv.i = verilator_top->dst_data;
+      out_data[in_data.size()-1][outa++] = conv.f;
+      eval();
+      if((outa%1024==0)&verilator_top->dst_valid){
+        verilator_top->dst_ready = 0;
+        eval();
+        verilator_top->dst_ready = 1;
       }
     }
 
     verilator_top->enbias = 0;
-    verilator_top->src_valid = 0;
     verilator_top->run = 0;
+    verilator_top->last = 0;
 
     enbias = 0;
     run = 0;
@@ -278,6 +322,10 @@ void conv2d_op_internal(const tensor_t &prev_out,
   size_t kw          = params.weight.width_;
   size_t kh          = params.weight.height_;
 
+  size_t ina, outa;
+
+  if(id!=1){ // because input delta NOT USED
+
   verilator_top->dd = 0;
   verilator_top->ss = ow*oh*od-1;
   verilator_top->id = od-1;
@@ -311,10 +359,12 @@ void conv2d_op_internal(const tensor_t &prev_out,
   vkw = kw-1;
 
   verilator_top->backprop = 1;
+  verilator_top->deltaw = 0;
   verilator_top->enbias = 0;
   verilator_top->wwrite = 0;
   verilator_top->bwrite = 0;
   verilator_top->run = 0;
+  verilator_top->last = 0;
   verilator_top->src_valid = 0;
   verilator_top->dst_ready = 1;
 
@@ -345,6 +395,17 @@ void conv2d_op_internal(const tensor_t &prev_out,
   eval();
   verilator_top->src_valid = 1;
 
+  for(ina = 0; ina < ow*oh*od; ){
+    if(verilator_top->src_ready){
+      conv.f = curr_delta[0][ina++];
+      verilator_top->src_data = conv.i;
+    }
+    eval();
+  }
+
+  verilator_top->src_valid = 0;
+  eval();
+
   // NOT supported parametor
   // params.tbl.is_connected
   // params.w_stride
@@ -352,27 +413,37 @@ void conv2d_op_internal(const tensor_t &prev_out,
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
     // propagate delta to previous layer
 
-    if(id!=1){ // because input delta NOT USED
+    const vec_t &in = curr_delta[sample+1];
+    vec_t &a        = prev_delta[sample-1];
 
-    size_t ina=0;
-    size_t outa=0;
-    const vec_t &in = curr_delta[sample];
-    vec_t &a        = prev_delta[sample];
-
-    while(!verilator_top->dst_valid) {
-      if(verilator_top->src_ready){
-        conv.f = in[ina++];
-        verilator_top->src_data = conv.i;
+    if(sample!=0){
+      while(!verilator_top->dst_valid){
+        eval();
       }
+      for(outa = 0; outa < iw*ih*id; ){
+        conv.i = verilator_top->dst_data;
+        a[outa++] = conv.f;
+        eval();
+      }
+    }
+
+    for(int i = 0; i < 10; i++){
       eval();
     }
 
-    while(verilator_top->dst_valid){
-      conv.i = verilator_top->dst_data;
-      a[outa++] = conv.f;
-      eval();
-    }
-
+    if(sample+1<prev_out.size()){
+      verilator_top->src_valid = 1;
+      for(ina = 0; ina < ow*oh*od; ){
+        if(verilator_top->src_ready){
+          conv.f = in[ina++];
+          verilator_top->src_data = conv.i;
+        }
+        eval();
+      }
+      verilator_top->src_valid = 0;
+        eval();
+    }else{
+      verilator_top->last = 1;
     }
 
     //if(1){
@@ -402,13 +473,25 @@ void conv2d_op_internal(const tensor_t &prev_out,
         }
       }
     }
+  }//for sample
+
+  while(!verilator_top->dst_valid) {
+    eval();
   }
+  for(outa = 0; outa < iw*ih*id; ){
+    conv.i = verilator_top->dst_data;
+    prev_delta[prev_out.size()-1][outa++] = conv.f;
+    eval();
+  }
+
   verilator_top->backprop = 0;
-  verilator_top->src_valid = 0;
   verilator_top->run = 0;
+  verilator_top->last = 0;
 
   backprop = 0;
   run = 0;
+
+  } // if(id!=1)
 
   verilator_top->ss = iw*ih*id-1;
   verilator_top->dd = id-1;
@@ -443,10 +526,12 @@ void conv2d_op_internal(const tensor_t &prev_out,
   vkw = ow-1;
 
   verilator_top->backprop = 0;
+  verilator_top->deltaw = 1;
   verilator_top->enbias = 0;
   verilator_top->wwrite = 0;
   verilator_top->bwrite = 0;
   verilator_top->run = 0;
+  verilator_top->last = 0;
   verilator_top->src_valid = 0;
   verilator_top->dst_ready = 1;
 
@@ -457,54 +542,83 @@ void conv2d_op_internal(const tensor_t &prev_out,
   run = 0;
   eval();
 
+  verilator_top->run = 1;
+  run = 1;
+  verilator_top->wwrite = 1;
+  wwrite = 1;
+  eval();
+  verilator_top->src_valid = 1;
+  for(size_t i=0;i<ow*oh*od;i++){
+    conv.f = curr_delta[0][i];
+    verilator_top->src_data = conv.i;
+    eval();
+  }
+  verilator_top->src_valid = 0;
+  eval();
+  verilator_top->wwrite = 0;
+  wwrite = 0;
+  eval();
+
+  verilator_top->src_valid = 1;
+  for(ina = 0; ina < iw*ih*id; ){
+    if(verilator_top->src_ready){
+      conv.f = prev_out[0][ina++];
+      verilator_top->src_data = conv.i;
+    }
+    eval();
+  }
+  verilator_top->src_valid = 0;
+  eval();
+
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
     // accumulate dw
 
-    size_t ina=0;
-    size_t outa=0;
+    const vec_t &delta = curr_delta[sample+1];
+    const vec_t &prevo = prev_out[sample+1];
 
-    const vec_t &delta = curr_delta[sample];
-    const vec_t &prevo = prev_out[sample];
-
-    verilator_top->wwrite = 1;
-    wwrite = 1;
-    eval();
-    verilator_top->src_valid = 1;
-    for(size_t i=0;i<ow*oh*od;i++){
-      conv.f = delta[i];
-      verilator_top->src_data = conv.i;
-      eval();
-    }
-    verilator_top->src_valid = 0;
-    eval();
-    verilator_top->wwrite = 0;
-    wwrite = 0;
-    eval();
-
-    verilator_top->run = 1;
-    run = 1;
-    eval();
-    verilator_top->src_valid = 1;
-
-    while(!verilator_top->dst_valid) {
-      if(verilator_top->src_ready){
-        conv.f = prevo[ina++];
-        verilator_top->src_data = conv.i;
+    if(sample!=0){
+      while(!verilator_top->dst_valid) {
+        eval();
       }
-      eval();
+      for(outa = 0; outa < kw*kh*id*od; ){
+        conv.i = verilator_top->dst_data;
+        dW[sample-1][outa++] = conv.f;
+        eval();
+      }
     }
 
-    while(verilator_top->dst_valid){
-      conv.i = verilator_top->dst_data;
-      dW[sample][outa++] = conv.f;
+    if(sample+1<prev_out.size()){
+      verilator_top->wwrite = 1;
+      wwrite = 1;
       eval();
-    }
+      verilator_top->src_valid = 1;
+      for(size_t i=0;i<ow*oh*od;i++){
+        conv.f = delta[i];
+        verilator_top->src_data = conv.i;
+        eval();
+      }
+      verilator_top->src_valid = 0;
+      eval();
+      verilator_top->wwrite = 0;
+      wwrite = 0;
+      eval();
 
-    verilator_top->src_valid = 0;
-    eval();
-    verilator_top->run = 0;
-    run = 0;
-    eval();
+      verilator_top->run = 1;
+      run = 1;
+      eval();
+      verilator_top->src_valid = 1;
+      for(ina = 0; ina < iw*ih*id; ){
+        if(verilator_top->src_ready){
+          conv.f = prevo[ina++];
+          verilator_top->src_data = conv.i;
+        }
+        eval();
+      }
+      verilator_top->src_valid = 0;
+      eval();
+    }else{
+      verilator_top->last = 1;
+    }
 
     //if(1){
     if(0){
@@ -547,7 +661,23 @@ void conv2d_op_internal(const tensor_t &prev_out,
         db[sample][outc] += dst;
       }
     }
-  };
+  }//for(sample)
+
+  while(!verilator_top->dst_valid) {
+    eval();
+  }
+  for(outa = 0; outa < kw*kh*id*od; ){
+    conv.i = verilator_top->dst_data;
+    dW[prev_out.size()-1][outa++] = conv.f;
+    eval();
+  }
+
+  verilator_top->run = 0;
+  verilator_top->last = 0;
+  verilator_top->deltaw = 0;
+  run = 0;
+  eval();
+
   cbt += std::chrono::high_resolution_clock::now() - cst;
   if(++cb==3750) std::cout << "cov back "
                            << std::chrono::duration_cast<std::chrono::milliseconds>(cbt).count() << "ms elapsed"

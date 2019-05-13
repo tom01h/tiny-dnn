@@ -1,40 +1,52 @@
 module src_buf
   (
-   input wire        clk,
-   input wire        src_v,
-   input wire [11:0] src_a,
-   input wire [15:0] src_d,
-   input wire        exec,
-   input wire [11:0] ia,
-   output reg [15:0] d
+   input wire         clk,
+   input wire         src_v,
+   input wire [12:0]  src_a,
+   input wire [15:0]  src_d,
+   input wire         exec,
+   input wire [12:0]  ia,
+   output wire [15:0] d
    );
 
-   reg [15:0]        buff [0:4095];
+   reg [15:0]        buff0 [0:4095];
+   reg [15:0]        buff1 [0:4095];
+
+   reg [15:0]        d0,d1;
+   assign d = (ia[12]) ? d1 : d0;
 
    always_ff @(posedge clk)begin
-      if(src_v)begin
-         buff[src_a] <= src_d;
-      end else if(exec)begin
-         d <= buff[ia];
+      if(src_v&~src_a[12])begin
+         buff0[src_a[11:0]] <= src_d;
+      end else if(exec&~ia[12])begin
+         d0 <= buff0[ia[11:0]];
+      end
+   end
+   always_ff @(posedge clk)begin
+      if(src_v&src_a[12])begin
+         buff1[src_a[11:0]] <= src_d;
+      end else if(exec&ia[12])begin
+         d1 <= buff1[ia[11:0]];
       end
    end
 endmodule
 
 module dst_buf
   (
-   input wire        clk,
-   input wire        dst_v,
-   input wire [11:0] dst_a,
-   output reg [31:0] dst_d,
-   input wire        outr,
-   input wire [11:0] oa,
-   input wire [31:0] x
+   input wire         clk,
+   input wire         dst_v,
+   input wire [12:0]  dst_a,
+   output wire [31:0] dst_d,
+   input wire         outr,
+   input wire [12:0]  oa,
+   input wire [31:0]  x
    );
 
-   reg [31:0]        buff [0:4095];
+   reg [31:0]        buff0 [0:4095];
+   reg [31:0]        buff1 [0:4095];
 
    reg               outrl;
-   reg [11:0]        oal;
+   reg [12:0]        oal;
 
    always_ff @(posedge clk)begin
       if(outr)begin
@@ -45,11 +57,21 @@ module dst_buf
       end
    end
 
+   real dst_d0, dst_d1;
+   assign dst_d = (dst_a[12]) ? dst_d1 : dst_d0;
+
    always_ff @(posedge clk)begin
-      if(outrl)begin
-         buff[oal] <= x;
-      end else if(dst_v)begin
-         dst_d <= buff[dst_a];
+      if(outrl&~oal[12])begin
+         buff0[oal[11:0]] <= x;
+      end else if(dst_v&~dst_a[12])begin
+         dst_d0 <= buff0[dst_a[11:0]];
+      end
+   end
+   always_ff @(posedge clk)begin
+      if(outrl&oal[12])begin
+         buff1[oal[11:0]] <= x;
+      end else if(dst_v&dst_a[12])begin
+         dst_d1 <= buff1[dst_a[11:0]];
       end
    end
 endmodule

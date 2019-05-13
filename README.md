@@ -46,12 +46,10 @@ $ ${SDK path}/gnu/aarch64/nt/aarch64-linux/bin/aarch64-linux-gnu-g++.exe -O3 -mt
 
 ### 残件
 
-- AXI-Stream マスタは最後の転送で LAST を出す
 - バス幅を広げる
-- 16bit 転送にする
+- bfloat16 のデータを送る
 - 転送と演算と並列実行する
   - (済) ユーザ空間 ⇔ DMA バッファ間の転送
-  - DMA バッファ ⇔ IP 内バッファの転送
+  - (SIM済) DMA バッファ ⇔ IP 内バッファの転送
   - (済) 演算コア → IP 内バッファの転送
-- (済) udmabuf を使ってみる
 - ΔW を累積する

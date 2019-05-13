@@ -7,6 +7,7 @@ module batch_ctrl
    input wire         run,
    input wire         wwrite,
    input wire         bwrite,
+   input wire         last,
 
    input wire         src_valid,
    input wire         src_last,
@@ -21,6 +22,10 @@ module batch_ctrl
    output wire        dst_v,
    output wire [11:0] dst_a,
 
+   output reg         execp,
+   output wire        inp,
+   output wire        outp,
+
    input wire [11:0]  ss,
    input wire [11:0]  ds,
    input wire [3:0]   id,
@@ -28,6 +33,41 @@ module batch_ctrl
    input wire [9:0]   fs,
    input wire [9:0]   ks
    );
+
+   assign inp  = ~execp;
+   assign outp = ~execp;
+   reg [1:0]          src_en;
+   wire               src_fin;
+   reg                s_fin_h;
+
+   wire               s_fin_in = (s_fin | s_fin_h) & (src_en[inp] | last);
+
+   always @(posedge clk)begin
+      if(~run)begin
+         s_init <= 1'b0;
+         execp <= 1'b1;
+         s_fin_h <= 1'b0;
+      end else if(src_fin & src_en[1:0]==2'b00)begin
+         s_init <= 1'b1;
+         execp <= ~execp;
+      end else if(s_fin_in)begin
+         s_init <= ~last;
+         execp <= ~execp;
+         s_fin_h <= 1'b0;
+      end else if(s_fin)begin
+         s_fin_h <= 1'b1;
+      end else begin
+         s_init <= 1'b0;
+      end
+
+      if(~run)begin
+         src_en[1:0] <= 2'b00;
+      end else if(src_fin)begin
+         src_en[inp] <= 1'b1;
+      end else if(s_fin_in & src_en[inp])begin
+         src_en[execp] <= 1'b0;
+      end
+   end
 
 ////////////////////// dst_v, dst_a /// dst_valid ///////////////
 
@@ -39,9 +79,9 @@ module batch_ctrl
 
    wire              dstart, dstart0;
    wire              dst_v0;
-   wire              dst_v0_in = s_fin|dst_v0&!last_da;
+   wire              dst_v0_in = s_fin_in|dst_v0&!last_da;
 
-   dff #(.W(1)) d_dstart0 (.in(s_fin), .data(dstart0), .clk(clk), .rst(~run), .en(den));
+   dff #(.W(1)) d_dstart0 (.in(s_fin_in), .data(dstart0), .clk(clk), .rst(~run), .en(den));
    dff #(.W(1)) d_dst_v0 (.in(dst_v0_in), .data(dst_v0), .clk(clk), .rst(~run), .en(den));
 
    assign dstart = den&dstart0;
@@ -60,26 +100,16 @@ module batch_ctrl
    reg [11:0]        sa;
 
    wire              sen = src_valid&src_ready;
+   wire              sstart = sen&run&~wwrite;
 
-   wire              src_ready_n;
-   assign src_ready = !src_ready_n;
-
-   wire              sstart, sstart0, sstart0_in;
-
-   dff #(.W(1)) d_sstart0 (.in(run&!(dst_valid&!dst_v0)), .data(sstart0), .clk(clk), .rst(~run),
-                           .en(sen| (dst_valid&!dst_v0)) );
-
-   assign sstart = sen&run&!sstart0;
-
-   wire              src_ready_n_in = ~(src_ready&!last_sa | dst_valid&!dst_v0);
-   dff #(.W(1)) d_src_ready_n (.in(src_ready_n_in), .data(src_ready_n),
-                               .clk(clk), .rst(~run), .en(1'b1));
+   assign src_ready = (src_en!=2'b11);
 
    loop1 #(.W(12)) l_sa(.ini(12'd0), .fin(ss),  .data(sa), .start(sstart),  .last(last_sa),
                         .clk(clk),   .rst(~src_ready|~run), .next(next_sa),   .en(sen) );
    assign src_a = sa;
    assign src_v = run & src_valid & src_ready;
    dff #(.W(1)) d_s_init (.in(last_sa), .data(s_init), .clk(clk), .rst(~run), .en(1'b1));
+   assign src_fin = last_sa;
 
 ////////////////////// prm_v, prm_a /////////////////////////////
 
