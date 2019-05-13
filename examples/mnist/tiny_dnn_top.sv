@@ -3,10 +3,12 @@ module tiny_dnn_top
    input wire        clk,
 
    input wire        backprop,
+   input wire        deltaw,
    input wire        enbias,
    input wire        run,
    input wire        wwrite,
    input wire        bwrite,
+   input wire        last,
 
    output wire       sc_s_init,
    output wire       sc_out_busy,
@@ -59,10 +61,13 @@ module tiny_dnn_top
    // sample control -> core, src buffer
    wire               exec;
    wire [11:0]        ia;
+   wire               execp;
+   wire               inp;
    // out control -> core, dst buffer
    wire               outr;
    wire [11:0]        oa;
    wire               sum_update;
+   wire               outp;
 
    // batch control -> weight buffer
    wire [3:0]         prm_v;
@@ -92,6 +97,7 @@ module tiny_dnn_top
       .run(run),
       .wwrite(wwrite),
       .bwrite(bwrite),
+      .last(last),
 
       .src_valid(src_valid),
       .src_last(src_last),
@@ -106,6 +112,10 @@ module tiny_dnn_top
       .dst_v(dst_v),
       .dst_a(dst_a[11:0]),
 
+      .execp(execp),
+      .inp(inp),
+      .outp(outp),
+
       .ss(ss[11:0]),
       .ds(ds[11:0]),
       .id(id[3:0]),
@@ -118,10 +128,10 @@ module tiny_dnn_top
      (
       .clk(clk),
       .src_v(src_v),
-      .src_a(src_a[11:0]),
+      .src_a({inp,src_a[11:0]}),
       .src_d(src_data),
       .exec(exec|k_init),
-      .ia(ia[11:0]),
+      .ia({execp,ia[11:0]}),
       .d(d)
       );
 
@@ -129,10 +139,10 @@ module tiny_dnn_top
      (
       .clk(clk),
       .dst_v(dst_v),
-      .dst_a(dst_a[11:0]),
+      .dst_a({outp,dst_a[11:0]}),
       .dst_d(dst_data),
       .outr(outr),
-      .oa(oa[11:0]),
+      .oa({execp,oa[11:0]}),
       .x(x)
       );
 
@@ -211,8 +221,8 @@ module tiny_dnn_top
                 .outr(outr),
                 .update(sum_update),
                 .bias(k_fin&enbias),
-                .ra(wa[9:0]),
-                .wa(prm_a[9:0]),
+                .ra({deltaw&execp,wa[9:0]}),
+                .wa({deltaw&inp,  prm_a[9:0]}),
                 .d(d),
                 .wd(src_data),
                 .sum_in(sum[i+1]),
