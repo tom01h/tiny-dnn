@@ -57,7 +57,7 @@ module dst_buf
       end
    end
 
-   real dst_d0, dst_d1;
+   reg [31:0]        dst_d0, dst_d1;
    assign dst_d = (dst_a[12]) ? dst_d1 : dst_d0;
 
    always_ff @(posedge clk)begin

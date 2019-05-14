@@ -108,7 +108,6 @@ module batch_ctrl
                         .clk(clk),   .rst(~src_ready|~run), .next(next_sa),   .en(sen) );
    assign src_a = sa;
    assign src_v = run & src_valid & src_ready;
-   dff #(.W(1)) d_s_init (.in(last_sa), .data(s_init), .clk(clk), .rst(~run), .en(1'b1));
    assign src_fin = last_sa;
 
 ////////////////////// prm_v, prm_a /////////////////////////////
