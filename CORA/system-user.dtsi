@@ -16,18 +16,6 @@
         size = <0x040000>; // 256KB
         dma-coherent;
     };
-    udmabuf@2 {
-        compatible = "ikwzm,udmabuf-0.10.a";
-        device-name = "udmabuf2";
-        size = <0x040000>; // 256KB
-        dma-coherent;
-    };
-    udmabuf@3 {
-        compatible = "ikwzm,udmabuf-0.10.a";
-        device-name = "udmabuf3";
-        size = <0x040000>; // 256KB
-        dma-coherent;
-    };
 };
 
 &axi_dma_0 {

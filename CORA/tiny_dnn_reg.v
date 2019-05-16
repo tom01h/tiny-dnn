@@ -27,10 +27,12 @@ module tiny_dnn_reg
    ////////////////////////////////////////////////////////////////////////////
    // Control signal
    output reg        backprop,
+   output reg        deltaw,
    output reg        enbias,
    output reg        run,
    output reg        wwrite,
    output reg        bwrite,
+   output reg        last,
 
    output reg [11:0] ss,
    output reg [3:0]  id,
@@ -108,7 +110,7 @@ module tiny_dnn_reg
          S_AXI_RDATA <= 32'h0;
       end else if(read)begin
          case(S_AXI_ARADDR[5:2])
-           4'd0 : S_AXI_RDATA <= {27'h0, backprop, enbias, run, wwrite, bwrite};
+           4'd0 : S_AXI_RDATA <= {25'h0,last, deltaw, backprop, enbias, run, wwrite, bwrite};
            4'd1 : S_AXI_RDATA <= {22'h0,fs[9:0]};
            4'd2 : S_AXI_RDATA <= {22'h0,ks[9:0]};
            4'd3 : S_AXI_RDATA <= {27'h0,kh[4:0]};
@@ -135,10 +137,12 @@ module tiny_dnn_reg
    always @(posedge S_AXI_ACLK)begin
       if(~S_AXI_ARESETN)begin
            backprop <= 0;
+           deltaw <= 0;
            enbias <= 0;
            run <= 0;
            wwrite <= 0;
            bwrite <= 0;
+           last <= 0;
            fs[9:0] <= 0;
            ks[9:0] <= 0;
            kh[4:0] <= 0;
@@ -159,7 +163,7 @@ module tiny_dnn_reg
            dd[3:0] <= 0;
       end else if(write)begin
          case(wb_adr_i[5:2])
-           4'd0 : {backprop, enbias, run, wwrite, bwrite} <= wb_dat_i[4:0];
+           4'd0 : {last, deltaw, backprop, enbias, run, wwrite, bwrite} <= wb_dat_i[6:0];
            4'd1 : fs[9:0] <= wb_dat_i[9:0];
            4'd2 : ks[9:0] <= wb_dat_i[9:0];
            4'd3 : kh[4:0] <= wb_dat_i[4:0];
