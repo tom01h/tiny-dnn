@@ -66,7 +66,7 @@ ZynqMP で動かす場合は ```U96.md``` を参考にしてください。
 
 ### ブロックデザインを作る
 
-1. Vivado で tiny_dnn アクセラレータのファイル （```CORA/tiny_dnn_top.v, tiny_dnn_reg.v``` と ```examples/mnist/tiny_dnn_buf.sv, tiny_dnn_control.sv, tiny_dnn_core.sv``` ）を開く
+1. Vivado で tiny_dnn アクセラレータのファイル （```CORA/tiny_dnn_top.v, tiny_dnn_reg.v``` と ```examples/mnist/tiny_dnn_buf.sv, tiny_dnn_control.sv, tiny_dnn_core.sv, tiny_dnn_ex_ctl.sv, loop_lib.sv``` ）を開く
 2. ブロックデザインの中に ```tiny_dnn_top``` を RTLモジュールとして追加する
 3. ほかの部品を ```design_1.pdf``` を参考に追加して結線する
 4. PL のクロックは 100MHz (METしないけど…)

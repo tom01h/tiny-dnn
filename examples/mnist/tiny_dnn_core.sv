@@ -20,8 +20,9 @@ module tiny_dnn_core
 
    real          W0 [0:f_size-1];
    real          W1 [0:f_size-1];
-   real          w, w1, d1;
+   real          w00, w01, w1, d1;
    reg           init1,exec1,bias1, init2,exec2,bias2;
+   reg           ra10d;
 
    wire [9:0]    biasa = f_size-1;
    wire [10:0]   radr = (bias)   ? {ra[10],biasa} : ra ;
@@ -35,16 +36,20 @@ module tiny_dnn_core
       if(write&~wadr[10])begin
          W0[wadr[9:0]] <= wd;
       end else if((exec|bias)&~radr[10])begin
-         w <= W0[radr[9:0]];
+         w00 <= W0[radr[9:0]];
       end
       if(write&wadr[10])begin
          W1[wadr[9:0]] <= wd;
       end else if((exec|bias)&radr[10])begin
-         w <= W1[radr[9:0]];
+         w01 <= W1[radr[9:0]];
       end
 
       if(exec1|bias1)begin
-         w1 <= w;
+         if(ra10d)begin
+            w1 <= w01;
+         end else begin
+            w1 <= w00;
+         end
          d1 <= d;
       end
       init1 <= init;
@@ -53,6 +58,7 @@ module tiny_dnn_core
       init2 <= init1;
       exec2 <= exec1;
       bias2 <= bias1;
+      ra10d <= ra[10];
       if(init2)begin
          suml <= 0;
       end else if(exec2)begin
