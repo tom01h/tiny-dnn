@@ -12,14 +12,10 @@
 
 volatile int *dnn_addr;
 volatile int *dma_addr;
-float *src0_addr;
-float *src1_addr;
-float *dst0_addr;
-float *dst1_addr;
-unsigned long src0_phys;
-unsigned long src1_phys;
-unsigned long dst0_phys;
-unsigned long dst1_phys;
+volatile float *src_addr;
+volatile float *dst_addr;
+unsigned long src_phys;
+unsigned long dst_phys;
 
 #include <iostream>
 
@@ -145,30 +141,18 @@ int main(int argc, char **argv) {
   int minibatch_size                     = 16;
   tiny_dnn::core::backend_t backend_type = tiny_dnn::core::default_engine();
 
-  int fd0,fd1,fd2,fd3,dma,dnn;
+  int fd0,fd1,dma,dnn;
 
   if ((fd0  = open("/sys/class/udmabuf/udmabuf0/phys_addr", O_RDONLY)) != -1) {
     char attr[1024];
     read(fd0, attr, 1024);
-    sscanf(attr, "%lx", &src0_phys);
+    sscanf(attr, "%lx", &src_phys);
     close(fd0);
   }
   if ((fd0  = open("/sys/class/udmabuf/udmabuf1/phys_addr", O_RDONLY)) != -1) {
     char attr[1024];
     read(fd0, attr, 1024);
-    sscanf(attr, "%lx", &src1_phys);
-    close(fd0);
-  }
-  if ((fd0  = open("/sys/class/udmabuf/udmabuf2/phys_addr", O_RDONLY)) != -1) {
-    char attr[1024];
-    read(fd0, attr, 1024);
-    sscanf(attr, "%lx", &dst0_phys);
-    close(fd0);
-  }
-  if ((fd0  = open("/sys/class/udmabuf/udmabuf3/phys_addr", O_RDONLY)) != -1) {
-    char attr[1024];
-    read(fd0, attr, 1024);
-    sscanf(attr, "%lx", &dst1_phys);
+    sscanf(attr, "%lx", &dst_phys);
     close(fd0);
   }
 
@@ -178,14 +162,6 @@ int main(int argc, char **argv) {
     return -1;
   }
   if ((fd1 = open("/dev/udmabuf1", O_RDWR)) < 0) {
-    perror("open");
-    return -1;
-  }
-  if ((fd2 = open("/dev/udmabuf2", O_RDWR)) < 0) {
-    perror("open");
-    return -1;
-  }
-  if ((fd3 = open("/dev/udmabuf3", O_RDWR)) < 0) {
     perror("open");
     return -1;
   }
@@ -211,28 +187,16 @@ int main(int argc, char **argv) {
     close(dma);
     return -1;
   }
-  src0_addr = (float*)mmap(NULL, 0x00040000, PROT_READ | PROT_WRITE, MAP_SHARED, fd0, 0);
-  if (src0_addr == MAP_FAILED) {
+  src_addr = (float*)mmap(NULL, 0x00080000, PROT_READ | PROT_WRITE, MAP_SHARED, fd0, 0);
+  if (src_addr == MAP_FAILED) {
     perror("mmap");
     close(fd0);
     return -1;
   }
-  src1_addr = (float*)mmap(NULL, 0x00040000, PROT_READ | PROT_WRITE, MAP_SHARED, fd1, 0);
-  if (src1_addr == MAP_FAILED) {
+  dst_addr = (float*)mmap(NULL, 0x00080000, PROT_READ | PROT_WRITE, MAP_SHARED, fd1, 0);
+  if (dst_addr == MAP_FAILED) {
     perror("mmap");
     close(fd1);
-    return -1;
-  }
-  dst0_addr = (float*)mmap(NULL, 0x00040000, PROT_READ | PROT_WRITE, MAP_SHARED, fd2, 0);
-  if (dst0_addr == MAP_FAILED) {
-    perror("mmap");
-    close(fd2);
-    return -1;
-  }
-  dst1_addr = (float*)mmap(NULL, 0x00040000, PROT_READ | PROT_WRITE, MAP_SHARED, fd3, 0);
-  if (dst1_addr == MAP_FAILED) {
-    perror("mmap");
-    close(fd3);
     return -1;
   }
 
