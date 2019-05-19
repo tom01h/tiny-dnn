@@ -66,6 +66,11 @@ ZynqMP で動かす場合は ```U96.md``` を参考にしてください。
 
 ### ブロックデザインを作る
 
+[NahiViva](https://github.com/tokuden/NahiViva) で再現できるようにしました。説明は [こっち](http://nahitafu.cocolog-nifty.com/nahitafu/2019/05/post-2cfa5c.html) を見た方が良いかも。  
+次のディレクトリ ```CORA/``` に必要なファイルをダウンロードして、```open_project_gui.cmd``` 実行でプロジェクトが再現されます。
+
+#### 手動でやるなら
+
 1. Vivado で tiny_dnn アクセラレータのファイル （```CORA/tiny_dnn_top.v, tiny_dnn_reg.v``` と ```examples/mnist/tiny_dnn_buf.sv, tiny_dnn_control.sv, tiny_dnn_core.sv, tiny_dnn_ex_ctl.sv, loop_lib.sv``` ）を開く
 2. ブロックデザインの中に ```tiny_dnn_top``` を RTLモジュールとして追加する
 3. ほかの部品を ```design_1.pdf``` を参考に追加して結線する

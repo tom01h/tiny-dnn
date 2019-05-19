@@ -8,8 +8,8 @@
 
 extern volatile int *dnn_addr;
 extern volatile int *dma_addr;
-extern float *src_addr;
-extern float *dst_addr;
+extern volatile float *src_addr;
+extern volatile float *dst_addr;
 extern unsigned long src_phys;
 extern unsigned long dst_phys;
 
@@ -18,6 +18,12 @@ extern unsigned long dst_phys;
 #include <chrono>    // for high_resolution_clock, NOLINT
 std::chrono::high_resolution_clock::time_point cst;
 std::chrono::high_resolution_clock::duration cft, cbt, cdt;
+
+void dma_reset(){
+  dma_addr[0x30/4] = 4;
+  dma_addr[0x00/4] = 4;
+  while (dma_addr[0x00/4] & 0x4);
+}
 
 int cf=0;
 int cb=0;
@@ -74,19 +80,18 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
     /////////////////////////////////////////////////////////
     // Weight transfer
-    // AXI DMA reset
-    dma_addr[0x00/4] = 4;
-    while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
 
     // DMA Buffer
     for(size_t i=0;i<od*id*kh*kw;i++){
       src_addr[i] = W[i];
     }
+    __asm__("DSB 15");
 
     dnn_addr[0] = 0; // init
     dnn_addr[0] = 2; // wwrite
 
     // AXI DMA transfer tx
+    dma_reset();
     dma_addr[0x00/4] = 1;
     dma_addr[0x18/4] = src_phys;
     dma_addr[0x28/4] = od*id*kh*kw*4;
@@ -95,10 +100,6 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
     /////////////////////////////////////////////////////////
     // Bias transfer
-    // AXI DMA reset
-    dma_addr[0x00/4] = 4;
-    while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
-
     // DMA Buffer
     for (size_t o = 0; o < od; o++) {
       if (params.has_bias) {
@@ -107,11 +108,13 @@ inline void conv2d_op_internal(const tensor_t &in_data,
         src_addr[o] = 0;
       }
     }
+    __asm__("DSB 15");
 
     dnn_addr[0] = 0; // init
     dnn_addr[0] = 1; // bwrite
 
     // AXI DMA transfer tx
+    dma_reset();
     dma_addr[0x00/4] = 1;
     dma_addr[0x18/4] = src_phys;
     dma_addr[0x28/4] = od*4;
@@ -120,19 +123,16 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
     /////////////////////////////////////////////////////////
     // Run
-    // AXI DMA reset
-    dma_addr[0x30/4] = 4;
-    dma_addr[0x00/4] = 4;
-    while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
-
     dnn_addr[0] = 0;   // init
     dnn_addr[0] = 4|8; // run|enbias
 
     for(size_t i=0;i<iw*ih*id;i++){
       src_addr[i] = in_data[0][i];
     }
+    __asm__("DSB 15");
 
     // AXI DMA transfer tx
+    dma_reset();
     dma_addr[0x00/4] = 1;
     dma_addr[0x18/4] = src_phys;
     dma_addr[0x28/4] = iw*ih*id*4;
@@ -143,17 +143,14 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     for (size_t sample = 0; sample < in_data.size(); sample++) {
 
       if(sample!=0){
+        __asm__("DSB 15");
         for(size_t i=0;i<od*oh*ow;i++){
           out_data[sample-1][i] = dst_addr[i];
         }
       }
 
-      // AXI DMA reset
-      dma_addr[0x30/4] = 4;
-      dma_addr[0x00/4] = 4;
-      while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
-
       // AXI DMA transfer rx
+      dma_reset();
       dma_addr[0x30/4] = 1;
       dma_addr[0x48/4] = dst_phys;
       dma_addr[0x58/4] = ow*oh*od*4;
@@ -162,6 +159,7 @@ inline void conv2d_op_internal(const tensor_t &in_data,
         for(size_t i=0;i<iw*ih*id;i++){
           src_addr[i] = in_data[sample+1][i];
         }
+        __asm__("DSB 15");
 
         // AXI DMA transfer tx
         dma_addr[0x00/4] = 1;
@@ -176,9 +174,11 @@ inline void conv2d_op_internal(const tensor_t &in_data,
 
       // Wait for the rx to finish
       while ((dma_addr[0x34/4] & 0x1000)!=0x1000) ;
+      dma_reset();
 
     }
 
+    __asm__("DSB 15");
     for(size_t i=0;i<od*oh*ow;i++){
       out_data[in_data.size()-1][i] = dst_addr[i];
     }
@@ -283,19 +283,17 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
   /////////////////////////////////////////////////////////
   // Weight transfer
-  // AXI DMA reset
-  dma_addr[0x00/4] = 4;
-  while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
-
   // DMA Buffer
   for(size_t i=0;i<od*id*kh*kw;i++){
     src_addr[i] = W[i];
   }
+  __asm__("DSB 15");
 
   dnn_addr[0] = 0|16; // init|backprop
   dnn_addr[0] = 2|16; // wwrite|backprop
 
   // AXI DMA transfer tx
+  dma_reset();
   dma_addr[0x00/4] = 1;
   dma_addr[0x18/4] = src_phys;
   dma_addr[0x28/4] = od*id*kh*kw*4;
@@ -307,16 +305,13 @@ void conv2d_op_internal(const tensor_t &prev_out,
   for(size_t i=0;i<ow*oh*od;i++){
     src_addr[i] = curr_delta[0][i];
   }
+  __asm__("DSB 15");
 
   dnn_addr[0] = 0|16; // init|backprop
   dnn_addr[0] = 4|16; // run|backprop
 
-  // AXI DMA reset
-  dma_addr[0x30/4] = 4;
-  dma_addr[0x00/4] = 4;
-  while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
-
   // AXI DMA transfer tx
+  dma_reset();
   dma_addr[0x00/4] = 1;
   dma_addr[0x18/4] = src_phys;
   dma_addr[0x28/4] = ow*oh*od*4;
@@ -327,17 +322,14 @@ void conv2d_op_internal(const tensor_t &prev_out,
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
 
     if(sample!=0){
+      __asm__("DSB 15");
       for(size_t i=0;i<id*ih*iw;i++){
         prev_delta[sample-1][i] = dst_addr[i];
       }
     }
 
-    // AXI DMA reset
-    dma_addr[0x30/4] = 4;
-    dma_addr[0x00/4] = 4;
-    while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
-
     // AXI DMA transfer rx
+    dma_reset();
     dma_addr[0x30/4] = 1;
     dma_addr[0x48/4] = dst_phys;
     dma_addr[0x58/4] = iw*ih*id*4;
@@ -346,6 +338,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
       for(size_t i=0;i<ow*oh*od;i++){
         src_addr[i] = curr_delta[sample+1][i];
       }
+      __asm__("DSB 15");
 
       // AXI DMA transfer tx
       dma_addr[0x00/4] = 1;
@@ -360,9 +353,11 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     // Wait for the rx to finish
     while ((dma_addr[0x34/4] & 0x1000)!=0x1000) ;
+    dma_reset();
 
   }
 
+  __asm__("DSB 15");
   for(size_t i=0;i<id*ih*iw;i++){
     prev_delta[prev_out.size()-1][i] = dst_addr[i];
   }
@@ -400,9 +395,6 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
   /////////////////////////////////////////////////////////
   // current delta transfer
-  // AXI DMA reset
-  dma_addr[0x00/4] = 4;
-  while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
 
   // DMA Buffer
   size_t p=0;
@@ -413,6 +405,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
       sum += curr_delta[0][p];
       p++;
     }
+    __asm__("DSB 15");
     db[0][i] = sum;
   }
 
@@ -420,6 +413,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
   dnn_addr[0] = 2; // wwrite
 
   // AXI DMA transfer tx
+  dma_reset();
   dma_addr[0x00/4] = 1;
   dma_addr[0x18/4] = src_phys;
   dma_addr[0x28/4] = ow*oh*od*4;
@@ -431,11 +425,9 @@ void conv2d_op_internal(const tensor_t &prev_out,
   for(size_t i=0;i<iw*ih*id;i++){
     src_addr[i] = prev_out[0][i];
   }
+  __asm__("DSB 15");
 
-  // AXI DMA reset
-  dma_addr[0x30/4] = 4;
-  dma_addr[0x00/4] = 4;
-  while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
+  dma_reset();
 
   dnn_addr[0] = 0; // init
   dnn_addr[0] = 4|32; // run|deltaw
@@ -451,14 +443,11 @@ void conv2d_op_internal(const tensor_t &prev_out,
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
 
     if(sample!=0){
+      __asm__("DSB 15");
       for(size_t i=0;i<kw*kh*id*od;i++){
         dW[sample-1][i] = dst_addr[i];
       }
     }
-
-    // AXI DMA reset
-    dma_addr[0x00/4] = 4;
-    while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
 
     if(sample+1<prev_out.size()){
       dnn_addr[0] = 2|4|32; // wwrite|run|deltaw
@@ -471,24 +460,22 @@ void conv2d_op_internal(const tensor_t &prev_out,
           sum += curr_delta[sample+1][p];
           p++;
         }
+        __asm__("DSB 15");
         db[sample+1][i] = sum;
       }
 
       // AXI DMA transfer tx
+      dma_reset();
       dma_addr[0x00/4] = 1;
       dma_addr[0x18/4] = src_phys;
       dma_addr[0x28/4] = ow*oh*od*4;
 
       while ((dma_addr[0x04/4] & 0x1000)!=0x1000); // Wait for the tx to finish
 
-      // AXI DMA reset
-      dma_addr[0x30/4] = 4;
-      dma_addr[0x00/4] = 4;
-      while (dma_addr[0x00/4] & 0x4); // Wait for reset finish
-
     }
 
     // AXI DMA transfer rx
+    dma_reset();
     dma_addr[0x30/4] = 1;
     dma_addr[0x48/4] = dst_phys;
     dma_addr[0x58/4] = kw*kh*id*od*4;
@@ -499,6 +486,7 @@ void conv2d_op_internal(const tensor_t &prev_out,
       for(size_t i=0;i<iw*ih*id;i++){
         src_addr[i] = prev_out[sample+1][i];
       }
+      __asm__("DSB 15");
 
       // AXI DMA transfer tx
       dma_addr[0x00/4] = 1;
@@ -513,9 +501,11 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
     // Wait for the rx to finish
     while ((dma_addr[0x34/4] & 0x1000)!=0x1000) ;
+    dma_reset();
 
   }
 
+  __asm__("DSB 15");
   for(size_t i=0;i<kw*kh*id*od;i++){
     dW[prev_out.size()-1][i] = dst_addr[i];
   }
