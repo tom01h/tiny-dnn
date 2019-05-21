@@ -131,7 +131,9 @@ module batch_ctrl
    loop1 #(.W(4))  l_ic(.ini(4'd0),  .fin(ice), .data(ic), .start(wstart),  .last(last_ic),
                         .clk(clk),   .rst(wrst),            .next(next_ic),   .en(last_oc&wen) );
 
-   loop1 #(.W(4) ) l_oc(.ini(4'd0),  .fin(od),  .data(oc), .start(next_ic),  .last(last_oc),
+   wire [3:0]        odi = od/4;
+
+   loop1 #(.W(4) ) l_oc(.ini(4'd0),  .fin(odi), .data(oc), .start(next_ic),  .last(last_oc),
                         .clk(clk),   .rst(wrst),            .next(next_oc),   .en(last_ki&wen) );
 
    wire [9:0]        kie = (backprop) ? ks : ((bwrite) ? 0 : fs);

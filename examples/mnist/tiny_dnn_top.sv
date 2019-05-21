@@ -20,12 +20,16 @@ module tiny_dnn_top
    input wire [9:0]   sc_wa,
 
    input wire         src_valid,
-   input wire [31:0]  src_data,
+   input wire [15:0]  src_data0,
+   input wire [15:0]  src_data1,
+   input wire [15:0]  src_data2,
+   input wire [15:0]  src_data3,
    input wire         src_last,
    output wire        src_ready,
 
    output wire        dst_valid,
-   output wire [31:0] dst_data,
+   output wire [31:0] dst_data0,
+   output wire [31:0] dst_data1,
    output wire        dst_last,
    input wire         dst_ready,
 
@@ -124,7 +128,10 @@ module tiny_dnn_top
       .clk(clk),
       .src_v(src_v),
       .src_a({inp,src_a[11:0]}),
-      .src_d(src_data[31:16]),
+      .src_d0(src_data0),
+      .src_d1(src_data1),
+      .src_d2(src_data2),
+      .src_d3(src_data3),
       .exec(exec|k_init),
       .ia({execp,ia[11:0]}),
       .d(d)
@@ -135,7 +142,8 @@ module tiny_dnn_top
       .clk(clk),
       .dst_v(dst_v),
       .dst_a({outp,dst_a[11:0]}),
-      .dst_d(dst_data),
+      .dst_d0(dst_data0),
+      .dst_d1(dst_data1),
       .outr(outr),
       .oa({execp,oa[11:0]}),
       .x(x)
@@ -222,6 +230,16 @@ module tiny_dnn_top
    assign expo[f_num] = 0;
    assign addo[f_num] = 0;
 
+   wire [15:0]        write_data [0:f_num];
+   generate
+      genvar          j;
+      for (j = 0; j < f_num/4; j = j + 1) begin
+         assign write_data[j*4  ] = src_data0;
+         assign write_data[j*4+1] = src_data1;
+         assign write_data[j*4+2] = src_data2;
+         assign write_data[j*4+3] = src_data3;
+      end
+   endgenerate
    generate
       genvar i;
       for (i = 0; i < f_num; i = i + 1) begin
@@ -229,7 +247,7 @@ module tiny_dnn_top
                (
                 .clk(clk),
                 .init(k_init),
-                .write((wwrite|bwrite)&(prm_v[3:0] == i) & src_valid & src_ready),
+                .write((wwrite|bwrite)&(prm_v[3:0] == (i/4)) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
                 .outr(outr),
@@ -238,7 +256,7 @@ module tiny_dnn_top
                 .ra({deltaw&execp,wa[9:0]}),
                 .wa({deltaw&inp,  prm_a[9:0]}),
                 .d(d),
-                .wd(src_data[31:16]),
+                .wd(write_data[i]),
                 .signi(signo[i+1]),
                 .expi(expo[i+1]),
                 .addi(addo[i+1]),
