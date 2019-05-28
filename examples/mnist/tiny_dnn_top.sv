@@ -216,7 +216,7 @@ module tiny_dnn_top
 
    assign sum[f_num] = 0;
 
-   real write_data [0:f_num];
+   real write_data [0:f_num-1];
    generate
       genvar j;
       for (j = 0; j < f_num/4; j = j + 1) begin
