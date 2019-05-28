@@ -46,9 +46,8 @@ $ ${SDK path}/gnu/aarch64/nt/aarch64-linux/bin/aarch64-linux-gnu-g++.exe -O3 -mt
 
 ### 残件
 
-- (SIM済) バス幅を広げる
-- (SIM済) bfloat16 のデータを送る
-- (済) 転送と演算と並列実行する
+- (済) バス幅を広げる
+- (済) bfloat16 のデータを送る
 - ΔW を累積する
 - ディレイ対策 → 周波数アップ
 - 演算並列度あげる

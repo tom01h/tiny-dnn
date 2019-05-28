@@ -107,7 +107,7 @@ module batch_ctrl
    loop1 #(.W(12)) l_sa(.ini(12'd0), .fin(ss),  .data(sa), .start(sstart),  .last(last_sa),
                         .clk(clk),   .rst(~src_ready|~run), .next(next_sa),   .en(sen) );
    assign src_a = sa;
-   assign src_v = run & src_valid & src_ready;
+   assign src_v = run & src_valid & src_ready & ~wwrite;
    assign src_fin = last_sa;
 
 ////////////////////// prm_v, prm_a /////////////////////////////

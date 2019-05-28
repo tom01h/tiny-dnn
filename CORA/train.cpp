@@ -6,13 +6,14 @@
     in the LICENSE file.
 */
 
+#include <stdint.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
 
 volatile int *dnn_addr;
 volatile int *dma_addr;
-volatile float *src_addr;
+volatile int16_t *src_addr;
 volatile float *dst_addr;
 unsigned long src_phys;
 unsigned long dst_phys;
@@ -187,7 +188,7 @@ int main(int argc, char **argv) {
     close(dma);
     return -1;
   }
-  src_addr = (float*)mmap(NULL, 0x00080000, PROT_READ | PROT_WRITE, MAP_SHARED, fd0, 0);
+  src_addr = (int16_t*)mmap(NULL, 0x00080000, PROT_READ | PROT_WRITE, MAP_SHARED, fd0, 0);
   if (src_addr == MAP_FAILED) {
     perror("mmap");
     close(fd0);

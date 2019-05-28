@@ -30,16 +30,16 @@ module tiny_dnn_top
    ////////////////////////////////////////////////////////////////////////////
    // AXI Stream Master Interface
    output wire        M_AXIS_TVALID,
-   output wire [31:0] M_AXIS_TDATA,
-   output wire [3:0]  M_AXIS_TSTRB,
+   output wire [63:0] M_AXIS_TDATA,
+   output wire [7:0]  M_AXIS_TSTRB,
    output wire        M_AXIS_TLAST,
    input wire         M_AXIS_TREADY,
 
    ////////////////////////////////////////////////////////////////////////////
    // AXI Stream Slave Interface
    output wire        S_AXIS_TREADY,
-   input wire [31:0]  S_AXIS_TDATA,
-   input wire [3:0]   S_AXIS_TSTRB,
+   input wire [63:0]  S_AXIS_TDATA,
+   input wire [7:0]   S_AXIS_TSTRB,
    input wire         S_AXIS_TLAST,
    input wire         S_AXIS_TVALID
    );
@@ -49,17 +49,22 @@ module tiny_dnn_top
    wire               clk = AXIS_ACLK;
 
    wire               src_ready;
-   wire [31:0]        dst_data;
+   wire [31:0]        dst_data0;
+   wire [31:0]        dst_data1;
    wire               dst_valid;
 
    wire               src_valid = S_AXIS_TVALID;
-   wire [31:0]        src_data  = S_AXIS_TDATA;
+   wire [15:0]        src_data0 = S_AXIS_TDATA[15:0];
+   wire [15:0]        src_data1 = S_AXIS_TDATA[31:16];
+   wire [15:0]        src_data2 = S_AXIS_TDATA[47:32];
+   wire [15:0]        src_data3 = S_AXIS_TDATA[63:48];
    wire               src_last  = S_AXIS_TLAST;
    assign             S_AXIS_TREADY = src_ready;
 
    assign             M_AXIS_TVALID = dst_valid;
-   assign             M_AXIS_TDATA  = dst_data;
-   assign             M_AXIS_TSTRB  = {4{dst_valid}};
+   assign             M_AXIS_TDATA[31:0]  = dst_data0;
+   assign             M_AXIS_TDATA[63:32] = dst_data1;
+   assign             M_AXIS_TSTRB  = {8{dst_valid}};
 // assign             M_AXIS_TLAST  = dst_last;
    assign             M_AXIS_TLAST  = 1'b0;
    wire               dst_ready = M_AXIS_TREADY;
@@ -197,7 +202,10 @@ module tiny_dnn_top
       .clk(clk),
       .src_v(src_v),
       .src_a({inp,src_a[11:0]}),
-      .src_d(src_data[31:16]),
+      .src_d0(src_data0),
+      .src_d1(src_data1),
+      .src_d2(src_data2),
+      .src_d3(src_data3),
       .exec(exec|k_init),
       .ia({execp,ia[11:0]}),
       .d(d)
@@ -208,7 +216,8 @@ module tiny_dnn_top
       .clk(clk),
       .dst_v(dst_v),
       .dst_a({outp,dst_a[11:0]}),
-      .dst_d(dst_data),
+      .dst_d0(dst_data0),
+      .dst_d1(dst_data1),
       .outr(outr),
       .oa({execp,oa[11:0]}),
       .x(x)
@@ -282,6 +291,16 @@ module tiny_dnn_top
    assign expo[f_num] = 0;
    assign addo[f_num] = 0;
 
+   wire [15:0]        write_data [0:f_num-1];
+   generate
+      genvar          j;
+      for (j = 0; j < f_num/4; j = j + 1) begin
+         assign write_data[j*4  ] = src_data0;
+         assign write_data[j*4+1] = src_data1;
+         assign write_data[j*4+2] = src_data2;
+         assign write_data[j*4+3] = src_data3;
+      end
+   endgenerate
    generate
       genvar i;
       for (i = 0; i < f_num; i = i + 1) begin
@@ -289,7 +308,7 @@ module tiny_dnn_top
                (
                 .clk(clk),
                 .init(k_init),
-                .write((wwrite|bwrite)&(prm_v[3:0] == i) & src_valid & src_ready),
+                .write((wwrite|bwrite)&(prm_v[3:0] == (i/4)) & src_valid & src_ready),
                 .bwrite(bwrite),
                 .exec(exec),
                 .outr(outr),
@@ -298,7 +317,7 @@ module tiny_dnn_top
                 .ra({deltaw&execp,wa[9:0]}),
                 .wa({deltaw&inp,  prm_a[9:0]}),
                 .d(d),
-                .wd(src_data[31:16]),
+                .wd(write_data[i]),
                 .signi(signo[i+1]),
                 .expi(expo[i+1]),
                 .addi(addo[i+1]),

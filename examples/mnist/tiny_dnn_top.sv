@@ -230,7 +230,7 @@ module tiny_dnn_top
    assign expo[f_num] = 0;
    assign addo[f_num] = 0;
 
-   wire [15:0]        write_data [0:f_num];
+   wire [15:0]        write_data [0:f_num-1];
    generate
       genvar          j;
       for (j = 0; j < f_num/4; j = j + 1) begin
