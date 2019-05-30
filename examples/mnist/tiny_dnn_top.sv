@@ -69,6 +69,7 @@ module tiny_dnn_top
    wire               inp;
    // out control -> core, dst buffer
    wire               outr;
+   wire               accr;
    wire [11:0]        oa;
    wire               sum_update;
    wire               outp;
@@ -82,15 +83,11 @@ module tiny_dnn_top
    // batch control -> dst buffer
    wire               dst_v;
    wire [11:0]        dst_a;
+   wire               dst_acc;
 
    // core <-> src,dst buffer
    real               d;
    real               sum [0:f_num];
-   real               x;
-
-   always_ff @(posedge clk)begin
-      x <= sum[0];
-   end
 
    batch_ctrl batch_ctrl
      (
@@ -98,6 +95,7 @@ module tiny_dnn_top
       .s_init(s_init),
       .s_fin(s_fin),
       .backprop(backprop),
+      .deltaw(deltaw),
       .run(run),
       .wwrite(wwrite),
       .bwrite(bwrite),
@@ -115,6 +113,7 @@ module tiny_dnn_top
       .src_a(src_a[11:0]),
       .dst_v(dst_v),
       .dst_a(dst_a[11:0]),
+      .dst_acc(dst_acc),
 
       .execp(execp),
       .inp(inp),
@@ -150,14 +149,16 @@ module tiny_dnn_top
       .dst_d0(dst_data0),
       .dst_d1(dst_data1),
       .outr(outr),
+      .accr(accr),
       .oa({execp,oa[11:0]}),
-      .x(x)
+      .sum(sum[0])
       );
 
    out_ctrl out_ctrl
      (
       .clk(clk),
       .rst(~run),
+      .dst_acc(dst_acc),
       .s_init(s_init),
       .k_init(k_init),
       .k_fin(k_fin),
@@ -165,6 +166,7 @@ module tiny_dnn_top
       .od(od[3:0]),
       .os(os[9:0]),
       .outr(outr),
+      .accr(accr),
       .oa(oa[11:0]),
       .update(sum_update)
       );

@@ -4,6 +4,7 @@ module batch_ctrl
    output reg         s_init,
    input wire         s_fin,
    input wire         backprop,
+   input wire         deltaw,
    input wire         run,
    input wire         wwrite,
    input wire         bwrite,
@@ -21,6 +22,7 @@ module batch_ctrl
    output reg [11:0]  src_a,
    output wire        dst_v,
    output wire [11:0] dst_a,
+   output reg         dst_acc,
 
    output reg         execp,
    output wire        inp,
@@ -40,21 +42,26 @@ module batch_ctrl
    wire               src_fin;
    reg                s_fin_h;
 
-   wire               s_fin_in = (s_fin | s_fin_h) & (src_en[inp] | last);
+   wire               last_in;
+   wire               s_fin0;
+   wire               s_fin_in = (s_fin0 | s_fin_h) & (src_en[inp] | last_in);
+   dff #(.W(1)) d_s_fin0 (.in(s_fin), .data(s_fin0), .clk(clk), .rst(~run), .en(den));
 
    always @(posedge clk)begin
       if(~run)begin
          s_init <= 1'b0;
          execp <= 1'b1;
          s_fin_h <= 1'b0;
+         dst_acc <= 0;
       end else if(src_fin & src_en[1:0]==2'b00)begin
          s_init <= 1'b1;
          execp <= ~execp;
       end else if(s_fin_in)begin
-         s_init <= ~last;
+         s_init <= ~last_in;
          execp <= ~execp;
          s_fin_h <= 1'b0;
-      end else if(s_fin)begin
+         dst_acc <= deltaw;
+      end else if(s_fin0)begin
          s_fin_h <= 1'b1;
       end else begin
          s_init <= 1'b0;
@@ -75,11 +82,23 @@ module batch_ctrl
    wire              next_da;
    reg [11:0]        da;
 
+   reg               dst_run;
+
    wire              den = dst_ready;
 
    wire              dstart, dstart0;
    wire              dst_v0;
-   wire              dst_v0_in = s_fin_in|dst_v0&!last_da;
+   wire              dst_v0_in = s_fin_in&dst_run | dst_v0&!last_da;
+
+   assign last_in = last&dst_run;
+
+   always @(posedge clk)begin
+      if(~run)begin
+         dst_run <= ~deltaw;
+      end else if(s_fin_in)begin
+         dst_run <= dst_run | last;
+      end
+   end
 
    dff #(.W(1)) d_dstart0 (.in(s_fin_in), .data(dstart0), .clk(clk), .rst(~run), .en(den));
    dff #(.W(1)) d_dst_v0 (.in(dst_v0_in), .data(dst_v0), .clk(clk), .rst(~run), .en(den));
@@ -119,7 +138,7 @@ module batch_ctrl
 
    wire              wstart, wstart0, wstart1;
    wire              wrst = ~(wwrite|bwrite);
-   wire              wen = src_valid;
+   wire              wen = src_valid&src_ready;
 
    dff #(.W(1)) d_wstart0 (.in(wwrite|bwrite), .data(wstart0), .clk(clk), .rst(wrst), .en(1'b1));
    dff #(.W(1)) d_wstart1 (.in(wstart0), .data(wstart1), .clk(clk), .rst(wrst), .en(wen));
@@ -148,42 +167,58 @@ endmodule
 
 module out_ctrl
   (
-   input wire         clk,
-   input wire         rst,
-   input wire         s_init,
-   output wire        out_busy,
-   input wire         k_init,
-   input wire         k_fin,
-   input wire [3:0]   od,
-   input wire [9:0]   os,
-   output wire        outr,
-   output wire [11:0] oa,
-   output wire        update
+   input wire        clk,
+   input wire        rst,
+   input wire        dst_acc,
+   input wire        s_init,
+   output reg        out_busy,
+   input wire        k_init,
+   input wire        k_fin,
+   input wire [3:0]  od,
+   input wire [9:0]  os,
+   output reg        outr,
+   output wire       accr,
+   output reg [11:0] oa,
+   output reg        update
    );
+
+   reg               out_busy1;
+   reg               outr00;
 
    wire              last_wi, last_ct;
    wire              next_wi, next_ct;
    reg [9:0]         wi;
    reg [3:0]                  ct;
+   reg                        last_ct0;
+   reg               outr0, outr1;
+   reg               update0, update1;
 
-   wire              k_fin0, k_fin1, start;
-   wire              out_busy0, out_busy1;
+   assign accr = outr0&dst_acc;
+   wire start = k_fin&!outr00|last_ct0&out_busy1;
 
-   assign update = start;
-
-   dff #(.W(1)) d_k_fin0 (.in(k_fin), .data(k_fin0), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_k_fin1 (.in(k_fin0), .data(k_fin1), .clk(clk), .rst(rst), .en(!out_busy1|k_fin0));
-   dff #(.W(1)) d_start (.in(k_fin1&!out_busy1), .data(start), .clk(clk), .rst(rst), .en(1'b1));
-
-   dff #(.W(1)) d_out_busy0 (.in(k_fin|out_busy0&((ct+2)!=od)|out_busy1), .data(out_busy0),
-                             .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_out_busy1 (.in((k_fin|out_busy1)&out_busy), .data(out_busy1),
-                             .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_out_busy (.in((k_init&out_busy0|out_busy)&((ct+2)!=od)), .data(out_busy),
-                            .clk(clk), .rst(rst), .en(1'b1));
-
-   wire              outr_in = k_fin1|outr&!last_ct;
-   dff #(.W(1)) d_outr (.in(outr_in), .data(outr), .clk(clk), .rst(rst), .en(1'b1));
+   always @(posedge clk)begin
+      if(rst)begin
+         out_busy <= 1'b0;
+      end else if(last_ct0)begin
+         out_busy <= 1'b0;
+      end else if(k_init&outr0)begin
+         out_busy <= 1'b1;
+      end
+      if(rst)begin
+         out_busy1 <= 1'b0;
+      end else if(last_ct0)begin
+         out_busy1 <= 1'b0;
+      end else if(k_fin&out_busy)begin
+         out_busy1 <= 1'b1;
+      end
+      if(rst)begin
+         outr00 <= 1'b0;
+      end else if(start)begin
+         outr00 <= 1'b1;
+      end else if(last_ct)begin
+         outr00 <= 1'b0;
+      end
+   end
 
    loop1 #(.W(10)) l_wi(.ini(10'd0), .fin(os-1),.data(wi), .start(s_init),  .last(last_wi),
                         .clk(clk),   .rst(rst),             .next(next_wi),   .en(last_ct)  );
@@ -191,6 +226,17 @@ module out_ctrl
    loop1 #(.W(4))  l_ct(.ini(4'd0),  .fin(od),  .data(ct), .start(start),   .last(last_ct),
                         .clk(clk),   .rst(rst),             .next(next_ct),   .en(1'b1)  );
 
-   assign oa = ct*os+wi;
-
+   always @(posedge clk)begin
+      if(rst)begin
+         oa <= 0;
+         outr <= 1'b0;      outr1 <= 1'b0;      outr0 <= 1'b0;
+         update <= 1'b0;    update1 <= 1'b0;    update0 <= 1'b0;
+         last_ct0 <= 1'b0;
+      end else begin
+         oa <= ct*os+wi;
+         outr <= outr1;     outr1 <= outr0;     outr0 <= outr00|start;
+         update <= update1; update1 <= update0; update0 <= start;
+         last_ct0 <= last_ct;
+      end
+   end
 endmodule
