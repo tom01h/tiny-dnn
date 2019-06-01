@@ -95,11 +95,11 @@ class edge {
     // dst = grad_[0]
     std::copy(grad_head.begin(), grad_head.end(), pdst);
     // @todo consider adding parallelism
-    for (size_t sample = 1, sample_count = grad_.size(); sample < sample_count;
-         ++sample) {
-      // dst += grad_[sample]
-      vectorize::reduce<float_t>(&grad_[sample][0], sz, pdst);
-    }
+    //    for (size_t sample = 1, sample_count = grad_.size(); sample < sample_count;
+    //         ++sample) {
+    //      // dst += grad_[sample]
+    //      vectorize::reduce<float_t>(&grad_[sample][0], sz, pdst);
+    //    }
   }
 
   void clear_grads() {

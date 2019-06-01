@@ -72,14 +72,17 @@ endmodule
 
 module dst_buf
   (
-   input wire         clk,
-   input wire         dst_v,
-   input wire [12:0]  dst_a,
-   output wire [31:0] dst_d0,
-   output wire [31:0] dst_d1,
-   input wire         outr,
-   input wire [12:0]  oa,
-   input wire [31:0]  x
+   input wire               clk,
+   input wire               dst_v,
+   input wire [12:0]        dst_a,
+   output wire [31:0]       dst_d0,
+   output wire [31:0]       dst_d1,
+   input wire               outr,
+   input wire               accr,
+   input wire [12:0]        oa,
+   input wire               signo,
+   input wire signed [9:0]  expo,
+   input wire signed [31:0] addo
    );
 
    reg [31:0]        buff00 [0:2047];
@@ -87,16 +90,20 @@ module dst_buf
    reg [31:0]        buff10 [0:2047];
    reg [31:0]        buff11 [0:2047];
 
-   reg               outrl;
-   reg [12:0]        oal;
+   reg               accr2,    outr4, outr5;
+   reg [12:0]        oa2, oa3, oa4,   oa5;
+
+   reg [31:0]        y3;
+   wire [31:0]       nrm;
 
    always_ff @(posedge clk)begin
-      if(outr)begin
-         outrl <= 1'b1;
-         oal <= oa;
-      end else begin
-         outrl <= 1'b0;
-      end
+      accr2 <= accr;
+      outr4 <= outr;
+      outr5 <= outr4;
+      oa2   <= {oa[12],oa[11:0]};
+      oa3   <= {oa[12],oa2[11:0]};
+      oa4   <= {oa[12],oa3[11:0]};
+      oa5   <= oa4;
    end
 
    reg [31:0]        dst_d00, dst_d01, dst_d10, dst_d11;
@@ -104,27 +111,95 @@ module dst_buf
    assign dst_d1 = (dst_a[12]) ? dst_d11 : dst_d10;
 
    always_ff @(posedge clk)
-     if(outrl&~oal[12]&~oal[0])
-       buff00[oal[11:1]] <= x;
+     if(outr5&~oa5[12]&~oa5[0])
+       buff00[oa5[11:1]] <= nrm;
+     else if(accr& oa[12]&~oa[0])
+       dst_d00 <= buff00[oa[11:1]];
      else if(dst_v&~dst_a[12])
        dst_d00 <= buff00[dst_a[10:0]];
 
    always_ff @(posedge clk)
-     if(outrl&~oal[12]& oal[0])
-       buff01[oal[11:1]] <= x;
+     if(outr5&~oa5[12]& oa5[0])
+       buff01[oa5[11:1]] <= nrm;
+     else if(accr& oa[12]& oa[0])
+       dst_d10 <= buff01[oa[11:1]];
      else if(dst_v&~dst_a[12])
        dst_d10 <= buff01[dst_a[10:0]];
 
    always_ff @(posedge clk)
-     if(outrl& oal[12]&~oal[0])
-       buff10[oal[11:1]] <= x;
+     if(outr5& oa5[12]&~oa5[0])
+       buff10[oa5[11:1]] <= nrm;
+     else if(accr&~oa[12]&~oa[0])
+       dst_d01 <= buff10[oa[11:1]];
      else if(dst_v& dst_a[12])
        dst_d01 <= buff10[dst_a[10:0]];
 
    always_ff @(posedge clk)
-     if(outrl& oal[12]& oal[0])
-       buff11[oal[11:1]] <= x;
+     if(outr5& oa5[12]& oa5[0])
+       buff11[oa5[11:1]] <= nrm;
+     else if(accr&~oa[12]& oa[0])
+       dst_d11 <= buff11[oa[11:1]];
      else if(dst_v& dst_a[12])
        dst_d11 <= buff11[dst_a[10:0]];
 
+   always_ff @(posedge clk)begin
+      if(~accr2)begin
+         y3 <= 0;
+      end else if(~oa[12])begin
+         if(oa2[0]) y3 <= dst_d11;
+         else       y3 <= dst_d01;
+      end else begin
+         if(oa2[0]) y3 <= dst_d10;
+         else       y3 <= dst_d00;
+      end
+   end
+
+   reg signed [24:0]         frac;
+   reg signed [9:0]          expd;
+   reg signed [32:0]         add0;
+   reg signed [48:0]         alin;
+   reg                       sftout;
+
+   always_comb begin
+      frac = {2'b01,y3[22:0]};
+      expd = {1'b0,y3[30:23]} - expo + 127 + 7;
+
+      if(signo^y3[31])
+        add0 = -addo;
+      else
+        add0 = addo;
+
+      if(expd[9:6]!=0)
+        alin = 0;
+      else
+        alin = $signed({add0,16'h0})>>>expd[5:0];
+
+      sftout = (expd<0) | (alin[48:30]!={19{1'b0}}) & (alin[48:30]!={19{1'b1}});
+   end
+
+   reg             sign4;
+   reg signed [9:0] exp4;
+   reg signed [31:0] add4;
+
+   always_ff @(posedge clk)begin
+      if(!sftout&(y3[30:23]!=8'h0))begin
+         sign4 <= y3[31];
+         exp4 <= {1'b0,y3[30:23]}+127-9;
+         add4 <= alin + frac;
+      end else begin
+         sign4 <= signo;
+         exp4 <= expo;
+         add4 <= addo;
+      end
+   end
+
+   normalize normalize
+     (
+      .clk(clk),
+      .en(outr4),
+      .signo(sign4),
+      .expo(exp4),
+      .addo(add4),
+      .nrm(nrm)
+   );
 endmodule

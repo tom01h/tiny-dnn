@@ -40,7 +40,10 @@ $ ${SDK path}/gnu/aarch64/nt/aarch64-linux/bin/aarch64-linux-gnu-g++.exe -O3 -mt
 説明は ```examples/mnist/readme.md``` に整備中です。
 
 このくらい高速になります。  
-ただし、入力データの傾きを求める計算をスキップする変更をソフトウェアに入れています。
+ただし、次の変更をソフトウェアに入れています。
+
+1. 入力データの傾きを求める計算をスキップする
+2. 畳み込みレイヤで ΔW をミニバッチ分だけ累積する (FPGAのみ)
 
 ![](speed.svg)
 
@@ -48,7 +51,8 @@ $ ${SDK path}/gnu/aarch64/nt/aarch64-linux/bin/aarch64-linux-gnu-g++.exe -O3 -mt
 
 - (済) バス幅を広げる
 - (済) bfloat16 のデータを送る
-- ΔW を累積する
+- (SIM済) ΔW を累積する
 - ディレイ対策 → 周波数アップ
+- pooling のアクセラレータ化？
 - 演算並列度あげる
 
