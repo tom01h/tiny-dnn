@@ -56,13 +56,13 @@ module dst_buf
    real              buff0 [0:4095];
    real              buff1 [0:4095];
 
-   reg               accr3,    outr4, outr5;
+   reg               accr2,    outr4, outr5;
    reg [12:0]        oa2, oa3, oa4,   oa5;
 
    real              x4, x5, y20, y21, y3, y4, y5;
 
    always_ff @(posedge clk)begin
-      accr3 <= accr;
+      accr2 <= accr;
       outr4 <= outr;
       outr5 <= outr4;
       oa2   <= {oa[12],oa[11:0]};
@@ -96,7 +96,7 @@ module dst_buf
       end
    end
    always_ff @(posedge clk)begin
-      if(~accr3)begin
+      if(~accr2)begin
          y3 <= 0;
       end else if(~oa[12])begin
          y3 <= y21;
