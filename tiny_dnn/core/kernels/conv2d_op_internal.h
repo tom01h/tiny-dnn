@@ -148,19 +148,19 @@ inline void conv2d_op_internal(const tensor_t &in_data,
     verilator_top->src_valid = 1;
     for(size_t o=0;o<(od+3)/4;o++){
       for(size_t i=0;i<id*kh*kw;i++){
-        if((o+0)<od){
+        if((o*4+0)<od){
           conv16.f = W[(o*4+0)*id*kh*kw+i];
           verilator_top->src_data0 = conv16.i;
         }
-        if((o+1)<od){
+        if((o*4+1)<od){
           conv16.f = W[(o*4+1)*id*kh*kw+i];
           verilator_top->src_data1 = conv16.i;
         }
-        if((o+2)<od){
+        if((o*4+2)<od){
           conv16.f = W[(o*4+2)*id*kh*kw+i];
           verilator_top->src_data2 = conv16.i;
         }
-        if((o+3)<od){
+        if((o*4+3)<od){
           conv16.f = W[(o*4+3)*id*kh*kw+i];
           verilator_top->src_data3 = conv16.i;
         }
@@ -444,19 +444,19 @@ void conv2d_op_internal(const tensor_t &prev_out,
   for(size_t ii=0;ii<od;ii++){        //od-1=veri->id
     for(size_t o=0;o<(id+3)/4;o++){   //id-1=veri->od
       for(size_t i=0;i<kh*kw;i++){
-        if((o+0)<id){
+        if((o*4+0)<id){
           conv16.f = W[(o*4+0)*kh*kw+i+ii*kh*kw*id];
           verilator_top->src_data0 = conv16.i;
         }
-        if((o+1)<id){
+        if((o*4+1)<id){
           conv16.f = W[(o*4+1)*kh*kw+i+ii*kh*kw*id];
           verilator_top->src_data1 = conv16.i;
         }
-        if((o+2)<id){
+        if((o*4+2)<id){
           conv16.f = W[(o*4+2)*kh*kw+i+ii*kh*kw*id];
           verilator_top->src_data2 = conv16.i;
         }
-        if((o+3)<id){
+        if((o*4+3)<id){
           conv16.f = W[(o*4+3)*kh*kw+i+ii*kh*kw*id];
           verilator_top->src_data3 = conv16.i;
         }
@@ -674,19 +674,19 @@ void conv2d_op_internal(const tensor_t &prev_out,
   for(size_t o=0;o<(od+3)/4;o++){
     for(size_t i=0;i<ow*oh;){
       if(verilator_top->src_ready){
-        if((o+0)<od){
+        if((o*4+0)<od){
           conv16.f = curr_delta[0][(o*4+0)*oh*ow+i];
           verilator_top->src_data0 = conv16.i;
         }
-        if((o+1)<od){
+        if((o*4+1)<od){
           conv16.f = curr_delta[0][(o*4+1)*oh*ow+i];
           verilator_top->src_data1 = conv16.i;
         }
-        if((o+2)<od){
+        if((o*4+2)<od){
           conv16.f = curr_delta[0][(o*4+2)*oh*ow+i];
           verilator_top->src_data2 = conv16.i;
         }
-        if((o+3)<od){
+        if((o*4+3)<od){
           conv16.f = curr_delta[0][(o*4+3)*oh*ow+i];
           verilator_top->src_data3 = conv16.i;
         }
@@ -738,19 +738,19 @@ void conv2d_op_internal(const tensor_t &prev_out,
       for(size_t o=0;o<(od+3)/4;o++){
         for(size_t i=0;i<ow*oh;){
           if(verilator_top->src_ready){
-            if((o+0)<od){
+            if((o*4+0)<od){
               conv16.f = delta[(o*4+0)*oh*ow+i];
               verilator_top->src_data0 = conv16.i;
             }
-            if((o+1)<od){
+            if((o*4+1)<od){
               conv16.f = delta[(o*4+1)*oh*ow+i];
               verilator_top->src_data1 = conv16.i;
             }
-            if((o+2)<od){
+            if((o*4+2)<od){
               conv16.f = delta[(o*4+2)*oh*ow+i];
               verilator_top->src_data2 = conv16.i;
             }
-            if((o+3)<od){
+            if((o*4+3)<od){
               conv16.f = delta[(o*4+3)*oh*ow+i];
               verilator_top->src_data3 = conv16.i;
             }
