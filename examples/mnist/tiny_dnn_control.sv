@@ -38,29 +38,35 @@ module batch_ctrl
 
    assign inp  = ~execp;
    assign outp = ~execp;
+
+   wire               den = dst_ready;
+
    reg [1:0]          src_en;
    wire               src_fin;
    reg                s_fin_h;
 
-   wire               last_in;
    wire               s_fin0;
-   wire               s_fin_in = (s_fin0 | s_fin_h) & (src_en[inp] | last_in);
-   dff #(.W(1)) d_s_fin0 (.in(s_fin), .data(s_fin0), .clk(clk), .rst(~run), .en(den));
+   wire               s_fin_in = (s_fin0 | s_fin_h) & (src_en[inp] | last) & den;
+   dff #(.W(1)) d_s_fin0 (.in(s_fin), .data(s_fin0), .clk(clk), .rst(~run), .en(1'b1));
 
    always @(posedge clk)begin
+      if(~run)begin
+         dst_acc <= 0;
+      end else if(s_fin)begin
+         dst_acc <= deltaw;
+      end
+
       if(~run)begin
          s_init <= 1'b0;
          execp <= 1'b1;
          s_fin_h <= 1'b0;
-         dst_acc <= 0;
       end else if(src_fin & src_en[1:0]==2'b00)begin
          s_init <= 1'b1;
          execp <= ~execp;
       end else if(s_fin_in)begin
-         s_init <= ~last_in;
+         s_init <= ~last;
          execp <= ~execp;
          s_fin_h <= 1'b0;
-         dst_acc <= deltaw;
       end else if(s_fin0)begin
          s_fin_h <= 1'b1;
       end else begin
@@ -82,25 +88,13 @@ module batch_ctrl
    wire              next_da;
    reg [11:0]        da;
 
-   reg               dst_run;
-
-   wire              den = dst_ready;
+   wire              dst_run = ~deltaw|last;
 
    wire              dstart, dstart0;
    wire              dst_v0;
    wire              dst_v0_in = s_fin_in&dst_run | dst_v0&!last_da;
 
-   assign last_in = last&dst_run;
-
-   always @(posedge clk)begin
-      if(~run)begin
-         dst_run <= ~deltaw;
-      end else if(s_fin_in)begin
-         dst_run <= dst_run | last;
-      end
-   end
-
-   dff #(.W(1)) d_dstart0 (.in(s_fin_in), .data(dstart0), .clk(clk), .rst(~run), .en(den));
+   dff #(.W(1)) d_dstart0 (.in(s_fin_in&dst_run), .data(dstart0), .clk(clk), .rst(~run), .en(den));
    dff #(.W(1)) d_dst_v0 (.in(dst_v0_in), .data(dst_v0), .clk(clk), .rst(~run), .en(den));
 
    assign dstart = den&dstart0;
