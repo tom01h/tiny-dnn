@@ -110,37 +110,31 @@ module dst_buf
    assign dst_d0 = (dst_a[12]) ? dst_d01 : dst_d00;
    assign dst_d1 = (dst_a[12]) ? dst_d11 : dst_d10;
 
+   wire [10:0]      ra = (accr) ? oa[11:1] : dst_a[10:0];
+
    always_ff @(posedge clk)
      if(outr5&~oa5[12]&~oa5[0])
        buff00[oa5[11:1]] <= nrm;
-     else if(accr& oa[12]&~oa[0])
-       dst_d00 <= buff00[oa[11:1]];
-     else if(dst_v&~dst_a[12])
-       dst_d00 <= buff00[dst_a[10:0]];
+     else if((accr& oa[12]&~oa[0])|(dst_v&~dst_a[12]))
+       dst_d00 <= buff00[ra];
 
    always_ff @(posedge clk)
      if(outr5&~oa5[12]& oa5[0])
        buff01[oa5[11:1]] <= nrm;
-     else if(accr& oa[12]& oa[0])
-       dst_d10 <= buff01[oa[11:1]];
-     else if(dst_v&~dst_a[12])
-       dst_d10 <= buff01[dst_a[10:0]];
+     else if((accr& oa[12]& oa[0])|(dst_v&~dst_a[12]))
+       dst_d10 <= buff01[ra];
 
    always_ff @(posedge clk)
      if(outr5& oa5[12]&~oa5[0])
        buff10[oa5[11:1]] <= nrm;
-     else if(accr&~oa[12]&~oa[0])
-       dst_d01 <= buff10[oa[11:1]];
-     else if(dst_v& dst_a[12])
-       dst_d01 <= buff10[dst_a[10:0]];
+     else if((accr&~oa[12]&~oa[0])|(dst_v& dst_a[12]))
+       dst_d01 <= buff10[ra];
 
    always_ff @(posedge clk)
      if(outr5& oa5[12]& oa5[0])
        buff11[oa5[11:1]] <= nrm;
-     else if(accr&~oa[12]& oa[0])
-       dst_d11 <= buff11[oa[11:1]];
-     else if(dst_v& dst_a[12])
-       dst_d11 <= buff11[dst_a[10:0]];
+     else if((accr&~oa[12]& oa[0])|(dst_v& dst_a[12]))
+       dst_d11 <= buff11[ra];
 
    always_ff @(posedge clk)begin
       if(~accr2)begin
