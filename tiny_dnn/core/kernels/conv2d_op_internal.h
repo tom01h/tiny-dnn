@@ -613,7 +613,8 @@ void conv2d_op_internal(const tensor_t &prev_out,
   backprop = 0;
   run = 0;
   eval();
-  }
+
+  }//if(id!=1)
 
   ss          = (iw*ih*id+3)/4;
   ds          = (kw*kh*id*od+1)/2;
@@ -836,6 +837,10 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
         db[0][outc] += dst;
       }
+    }
+
+    while(!verilator_top->src_ready){
+      eval();
     }
   }//for(sample)
 
