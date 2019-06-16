@@ -523,41 +523,31 @@ void conv2d_op_internal(const tensor_t &prev_out,
 
   for (size_t sample = 0; sample < prev_out.size(); sample++) {
 
-    if(sample!=0){
-      __asm__("DSB 15");
-      for(size_t i=0;i<kw*kh*id*od;i++){
-        dW[sample-1][i] = dst_addr[i];
-      }
-    }
-
     if(sample+1<prev_out.size()){
       dnn_addr[0] = 2|4|32; // wwrite|run|deltaw
 
       ptr=0;
-      for(size_t o=0;o<od;o++){
-        db[sample+1][o] = 0;
-      }
       for(size_t o=0;o<(od+3)/4;o++){
         for(size_t i=0;i<ow*oh;i++){
           if((o*4+0)<od){
             conv16.f = curr_delta[sample+1][(o*4+0)*oh*ow+i];
             src_addr[ptr+0] = conv16.i;
-            db[sample+1][o*4+0] += conv16.f;
+            db[0][o*4+0] += conv16.f;
           }
           if((o*4+1)<od){
             conv16.f = curr_delta[sample+1][(o*4+1)*oh*ow+i];
             src_addr[ptr+1] = conv16.i;
-            db[sample+1][o*4+1] += conv16.f;
+            db[0][o*4+1] += conv16.f;
           }
           if((o*4+2)<od){
             conv16.f = curr_delta[sample+1][(o*4+2)*oh*ow+i];
             src_addr[ptr+2] = conv16.i;
-            db[sample+1][o*4+2] += conv16.f;
+            db[0][o*4+2] += conv16.f;
           }
           if((o*4+3)<od){
             conv16.f = curr_delta[sample+1][(o*4+3)*oh*ow+i];
             src_addr[ptr+3] = conv16.i;
-            db[sample+1][o*4+3] += conv16.f;
+            db[0][o*4+3] += conv16.f;
           }
           ptr+=4;
         }
@@ -573,12 +563,6 @@ void conv2d_op_internal(const tensor_t &prev_out,
       while ((dma_addr[0x04/4] & 0x1000)!=0x1000); // Wait for the tx to finish
     }
 
-    // AXI DMA transfer rx
-    dma_reset();
-    dma_addr[0x30/4] = 1;
-    dma_addr[0x48/4] = dst_phys;
-    dma_addr[0x58/4] = kw*kh*id*od*4;
-
     if(sample+1<prev_out.size()){
       dnn_addr[0] = 4|32; // run|deltaw
 
@@ -589,25 +573,36 @@ void conv2d_op_internal(const tensor_t &prev_out,
       __asm__("DSB 15");
 
       // AXI DMA transfer tx
+      dma_reset();
       dma_addr[0x00/4] = 1;
       dma_addr[0x18/4] = src_phys;
       dma_addr[0x28/4] = iw*ih*id*2;
 
       // Wait for the tx to finish
       while ((dma_addr[0x04/4] & 0x1000)!=0x1000);
+
     }else{
+      // AXI DMA transfer rx
+      dma_reset();
+      dma_addr[0x30/4] = 1;
+      dma_addr[0x48/4] = dst_phys;
+      dma_addr[0x58/4] = kw*kh*id*od*4;
+
       dnn_addr[0] = 4|32|64; // run|deltaw|last
     }
 
-    // Wait for the rx to finish
-    while ((dma_addr[0x34/4] & 0x1000)!=0x1000) ;
-    dma_reset();
+    // Wait for sample finish
+    while ((dnn_addr[0] & 0x80000000)!=0x80000000) ;
 
   }
 
+  // Wait for the rx to finish
+  while ((dma_addr[0x34/4] & 0x1000)!=0x1000) ;
+  dma_reset();
+
   __asm__("DSB 15");
   for(size_t i=0;i<kw*kh*id*od;i++){
-    dW[prev_out.size()-1][i] = dst_addr[i];
+    dW[0][i] = dst_addr[i];
   }
 
   dnn_addr[0] = 0; // idle

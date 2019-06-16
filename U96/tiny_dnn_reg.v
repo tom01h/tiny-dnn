@@ -26,6 +26,8 @@ module tiny_dnn_reg
 
    ////////////////////////////////////////////////////////////////////////////
    // Control signal
+   input wire        src_ready,
+
    output reg        backprop,
    output reg        deltaw,
    output reg        enbias,
@@ -110,7 +112,8 @@ module tiny_dnn_reg
          S_AXI_RDATA <= 32'h0;
       end else if(read)begin
          case(S_AXI_ARADDR[5:2])
-           4'd0 : S_AXI_RDATA <= {25'h0,last, deltaw, backprop, enbias, run, wwrite, bwrite};
+           4'd0 : S_AXI_RDATA <= {src_ready, 24'h0,
+                                  last, deltaw, backprop, enbias, run, wwrite, bwrite};
            4'd1 : S_AXI_RDATA <= {22'h0,fs[9:0]};
            4'd2 : S_AXI_RDATA <= {22'h0,ks[9:0]};
            4'd3 : S_AXI_RDATA <= {27'h0,kh[4:0]};

@@ -119,6 +119,8 @@ module tiny_dnn_top
       .S_AXI_RVALID(S_AXI_RVALID),
       .S_AXI_RREADY(S_AXI_RREADY),
 
+      .src_ready(src_ready),
+
       .backprop(backprop), .deltaw(deltaw), .enbias(enbias),
       .run(run), .wwrite(wwrite), .bwrite(bwrite), .last(last),
       .ss(ss), .id(id), .is(is), .ih(ih), .iw(iw),
@@ -143,6 +145,7 @@ module tiny_dnn_top
    wire               inp;
    // out control -> core, dst buffer
    wire               outr;
+   wire               accr;
    wire [11:0]        oa;
    wire               sum_update;
    wire               outp;
@@ -156,10 +159,13 @@ module tiny_dnn_top
    // batch control -> dst buffer
    wire               dst_v;
    wire [11:0]        dst_a;
+   wire               dst_acc;
 
    // core <-> src,dst buffer
    wire [15:0]        d;
-   wire [31:0]        x;
+   wire               signo [0:f_num];
+   wire signed [9:0]  expo [0:f_num];
+   wire signed [31:0] addo [0:f_num];
 
    batch_ctrl batch_ctrl
      (
@@ -167,6 +173,7 @@ module tiny_dnn_top
       .s_init(s_init),
       .s_fin(s_fin),
       .backprop(backprop),
+      .deltaw(deltaw),
       .run(run),
       .wwrite(wwrite),
       .bwrite(bwrite),
@@ -184,6 +191,7 @@ module tiny_dnn_top
       .src_a(src_a[11:0]),
       .dst_v(dst_v),
       .dst_a(dst_a[11:0]),
+      .dst_acc(dst_acc),
 
       .execp(execp),
       .inp(inp),
@@ -219,14 +227,18 @@ module tiny_dnn_top
       .dst_d0(dst_data0),
       .dst_d1(dst_data1),
       .outr(outr),
+      .accr(accr),
       .oa({execp,oa[11:0]}),
-      .x(x)
+      .signo(signo[0]),
+      .expo(expo[0]),
+      .addo(addo[0])
       );
 
    out_ctrl out_ctrl
      (
       .clk(clk),
       .rst(~run),
+      .dst_acc(dst_acc),
       .s_init(s_init),
       .k_init(k_init),
       .k_fin(k_fin),
@@ -234,6 +246,7 @@ module tiny_dnn_top
       .od(od[3:0]),
       .os(os[9:0]),
       .outr(outr),
+      .accr(accr),
       .oa(oa[11:0]),
       .update(sum_update)
       );
@@ -270,30 +283,13 @@ module tiny_dnn_top
       .rst(~run)
       );
 
-   wire               signo [0:f_num];
-   wire signed [9:0]  expo [0:f_num];
-   wire signed [31:0] addo [0:f_num];
-   wire [31:0]        nrm;
-
-   assign x = nrm;
-
-   normalize normalize
-     (
-      .clk(clk),
-      .en(outr),
-      .signo(signo[0]),
-      .expo(expo[0]),
-      .addo(addo[0]),
-      .nrm(nrm)
-      );
-
    assign signo[f_num] = 0;
    assign expo[f_num] = 0;
    assign addo[f_num] = 0;
 
    wire [15:0]        write_data [0:f_num-1];
    generate
-      genvar          j;
+      genvar j;
       for (j = 0; j < f_num/4; j = j + 1) begin
          assign write_data[j*4  ] = src_data0;
          assign write_data[j*4+1] = src_data1;
