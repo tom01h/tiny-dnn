@@ -7,7 +7,7 @@ module tiny_dnn_ex_ctl
    input wire         bwrite,
    input wire         s_init,
    input wire         out_busy,
-   input wire         outr,
+   input wire         outrf,
    output wire        s_fin,
    output wire        k_init,
    output wire        k_fin,
@@ -87,13 +87,9 @@ module tiny_dnn_ex_ctl
 // iy loop end
 // dc loop end
 
-   wire               s_fin0, s_fin1, s_fin2, s_fin3;
+   wire               s_fin0;
 
-   dff #(.W(1)) d_s_fin0 (.in(last_dc), .data(s_fin0), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_s_fin1 (.in(s_fin0), .data(s_fin1), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_s_fin2 (.in(s_fin1), .data(s_fin2), .clk(clk), .rst(rst), .en(1'b1));
-   dff #(.W(1)) d_s_fin3 (.in(s_fin2), .data(s_fin3), .clk(clk), .rst(rst), .en(!outr|s_fin2));
-
-   assign s_fin = s_fin3 & !outr;
+   dff #(.W(1)) d_s_fin0 (.in(last_dc), .data(s_fin0), .clk(clk), .rst(rst), .en(last_dc|outrf));
+   dff #(.W(1)) d_s_fin (.in(s_fin0&outrf), .data(s_fin), .clk(clk), .rst(rst), .en(1'b1));
 
 endmodule

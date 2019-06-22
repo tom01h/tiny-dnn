@@ -42,6 +42,7 @@ sc_signal <sc_uint<5> >  vkw;
 
 sc_signal <bool>         s_init;
 sc_signal <bool>         out_busy;
+sc_signal <bool>         outrf;
 sc_signal <bool>         s_fin;
 sc_signal <bool>         k_init;
 sc_signal <bool>         k_fin;
@@ -77,6 +78,7 @@ void eval()
   //          verilog -> SystemC
   s_init = verilator_top->sc_s_init;
   out_busy = verilator_top->sc_out_busy;
+  outrf = verilator_top->sc_outrf;
   //          SystemC -> verilog
 
   verilator_top->sc_s_fin = s_fin;
@@ -262,6 +264,7 @@ int sc_main(int argc, char **argv) {
   U_tiny_dnn_sc_ctl.bwrite(bwrite);
   U_tiny_dnn_sc_ctl.s_init(s_init);
   U_tiny_dnn_sc_ctl.out_busy(out_busy);
+  U_tiny_dnn_sc_ctl.outrf(outrf);
   U_tiny_dnn_sc_ctl.s_fin(s_fin);
   U_tiny_dnn_sc_ctl.k_init(k_init);
   U_tiny_dnn_sc_ctl.k_fin(k_fin);

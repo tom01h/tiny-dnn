@@ -1,8 +1,3 @@
-/***************************************\
-* This module has not been maintained   *
-*   since version 1edf594.              *
-\***************************************/
-
 #include "tiny_dnn_sc_ctl.h"
 
 void tiny_dnn_sc_ctl::exect()
@@ -65,14 +60,15 @@ void tiny_dnn_sc_ctl::exect()
             k_fin.write(1);
             wait();
             k_fin.write(0);
-            wait();
             while(out_busy.read()){
               wait();
             }
           }
         }
       }
-      wait();
+      while(!outrf.read()){
+        wait();
+      }
       s_fin.write(1);
       wait();
       s_fin.write(0);

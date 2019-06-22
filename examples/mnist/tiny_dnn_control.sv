@@ -171,6 +171,7 @@ module out_ctrl
    input wire [3:0]  od,
    input wire [9:0]  os,
    output reg        outr,
+   output reg        outrf,
    output wire       accr,
    output reg [11:0] oa,
    output reg        update
@@ -229,6 +230,7 @@ module out_ctrl
       end else begin
          oa <= ct*os+wi;
          outr <= outr1;     outr1 <= outr0;     outr0 <= outr00|start;
+         outrf <= outr1&~outr0;
          update <= update1; update1 <= update0; update0 <= start;
          last_ct0 <= last_ct;
       end

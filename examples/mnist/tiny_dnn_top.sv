@@ -12,6 +12,7 @@ module tiny_dnn_top
 
    output wire       sc_s_init,
    output wire       sc_out_busy,
+   output wire       sc_outrf,
    input wire        sc_s_fin,
    input wire        sc_k_init,
    input wire        sc_k_fin,
@@ -69,6 +70,7 @@ module tiny_dnn_top
    wire               inp;
    // out control -> core, dst buffer
    wire               outr;
+   wire               outrf;
    wire               accr;
    wire [11:0]        oa;
    wire               sum_update;
@@ -166,6 +168,7 @@ module tiny_dnn_top
       .od(od[3:0]),
       .os(os[9:0]),
       .outr(outr),
+      .outrf(outrf),
       .accr(accr),
       .oa(oa[11:0]),
       .update(sum_update)
@@ -174,6 +177,7 @@ module tiny_dnn_top
 /*
    assign sc_s_init = s_init;
    assign sc_out_busy = out_busy;
+   assign sc_outrf = outrf;
    assign s_fin = sc_s_fin;
    assign k_init = sc_k_init;
    assign k_fin = sc_k_fin;
@@ -191,7 +195,7 @@ module tiny_dnn_top
       .bwrite(bwrite),
       .s_init(s_init),
       .out_busy(out_busy),
-      .outr(outr),
+      .outrf(outrf),
 /**/
       .s_fin(s_fin),
       .k_init(k_init),

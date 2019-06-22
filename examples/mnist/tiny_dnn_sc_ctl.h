@@ -10,6 +10,7 @@ SC_MODULE(tiny_dnn_sc_ctl)
   sc_in  <bool>         bwrite;
   sc_in  <bool>         s_init;
   sc_in  <bool>         out_busy;
+  sc_in  <bool>         outrf;
   sc_out <bool>         s_fin;
   sc_out <bool>         k_init;
   sc_out <bool>         k_fin;
