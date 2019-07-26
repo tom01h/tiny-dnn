@@ -1,3 +1,9 @@
+# 新しいリポジトリに引っ越しました
+
+[ここです](https://github.com/tom01h/tiny-dnn-fpga)
+
+Depthwise separable convolution に手を付けています
+
 # tiny-dnn を FPGA で実行する
 
 tiny-dnn の畳み込みレイヤを Zynq の PL 部に作ったアクセラレータ回路にオフロードすることで、CNN の学習を加速します。  
